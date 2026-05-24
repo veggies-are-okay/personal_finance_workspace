@@ -1,0 +1,55 @@
+# --- Sensitive financial data (NEVER commit) ---
+# Real statements, the Gemini conversation, account screenshots, and seeded balances.
+docs/bank_statements/
+docs/gemini_investments_conversation/
+images/
+config/accounts.yaml
+*.local.yaml
+# Defense-in-depth: raw statement/screenshot files anywhere under docs/ or images/
+docs/**/*.csv
+docs/**/*.pdf
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
+images/**/*
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# --- Local / personal config (not shared) ---
+# .mcp.json holds a real API key locally; commit .mcp.json.example instead.
+.mcp.json
+.claude/settings.local.json
+# Cursor is not used here (rules live in .claude/rules/); never commit it.
+.cursor/
+
+# --- Notebooks (EDA runs over real financial data; cell outputs are sensitive) ---
+*.ipynb
+
+# --- Python (backend-python) ---
+__pycache__/
+*.py[cod]
+.venv/
+.python-version
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Node (backend-ts, frontend) ---
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/

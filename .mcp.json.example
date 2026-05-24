@@ -1,0 +1,35 @@
+{
+    "mcpServers": {
+      "sequential-thinking": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      },
+      "puppeteer": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+      },
+      "mermaid-mcp-server": {
+        "command": "mermaid-mcp-server"
+      },
+      "repomix": {
+        "command": "npx",
+        "args": ["-y", "repomix", "--mcp"]
+      },
+      "context7": {
+        "type": "http",
+        "url": "https://mcp.context7.com/mcp"
+      },
+      "playwright": {
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp"]
+      },
+      "perplexity": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@perplexity-ai/mcp-server"],
+        "env": {
+          "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"
+        }
+      }
+    }
+  }

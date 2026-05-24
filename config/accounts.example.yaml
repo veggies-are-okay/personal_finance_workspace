@@ -1,0 +1,40 @@
+# Template for config/accounts.yaml (which is GITIGNORED and holds real balances).
+# Copy to config/accounts.yaml and fill in real values locally. Keep this example
+# sanitized — placeholders / zeros only, NEVER real account numbers or balances.
+#
+# Schema (all amounts are decimal strings; see .claude/rules/backend-parity.md on money):
+
+cash:
+  - name: "Checking"
+    institution: "Example Bank"
+    type: "checking"
+    balance: "0.00"
+  - name: "High-Yield Savings"
+    institution: "Example HYSA"
+    type: "hysa"
+    balance: "0.00"
+    apy: "0.0"
+
+investments:
+  - name: "Individual Brokerage"
+    institution: "Example Brokerage"
+    type: "taxable_brokerage"
+    balance: "0.00"
+  - name: "401(k)"
+    institution: "Example Provider"
+    type: "401k"
+    balance: "0.00"
+
+# Student-loan tranches. The planning module models payoff strategies per tranche.
+loans:
+  - name: "Loan A"
+    type: "unsubsidized"
+    balance: "0.00"
+    interest_rate: "0.0"     # e.g. "6.80"
+    status: "repayment"
+
+# Long-term goals the planning module tracks toward.
+goals:
+  - name: "House down payment"
+    target_amount: "0.00"
+    target_date: "2027-01-01"

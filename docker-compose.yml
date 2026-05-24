@@ -1,0 +1,23 @@
+# Shared Postgres for both backends. Both backend-python/ and backend-ts/
+# read/write the SAME schema (Alembic owns migrations; TypeORM mirrors).
+# Run one backend at a time against this DB to compare parity.
+services:
+  postgres:
+    image: postgres:16
+    container_name: pf_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pf}
+      POSTGRES_DB: ${POSTGRES_DB:-personal_finance}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pf_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pf} -d ${POSTGRES_DB:-personal_finance}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pf_pgdata:
