@@ -45,7 +45,7 @@
   - *Verify:* `/health` parity test passes against both; OpenAPI diff clean.
 
 ### P1.5 — frontend scaffold
-- [ ] Vite + React + Tailwind app; API client reads `VITE_API_BASE_URL`; renders backend `/health`.
+- [x] Vite + React + Tailwind app; API client reads `VITE_API_BASE_URL`; renders backend `/health`.
   - *Verify:* `npm run dev` loads; `npm run lint && npm run test -- --coverage` (≥80%) passes.
 
 ---
