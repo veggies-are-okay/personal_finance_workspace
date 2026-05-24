@@ -1,0 +1,22 @@
+{
+  "name": "contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Cross-backend parity harness: canonical OpenAPI contract + tests that boot both backends (FastAPI + NestJS) and assert identical /health responses and structurally-equivalent OpenAPI. Enforces Rule #1 (see .claude/rules/backend-parity.md).",
+  "scripts": {
+    "build:backends": "uv sync --project ../backend-python && npm --prefix ../backend-ts install && npm --prefix ../backend-ts run build",
+    "pretest:parity": "npm run build:backends",
+    "test:parity": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\" \"*.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
+  }
+}

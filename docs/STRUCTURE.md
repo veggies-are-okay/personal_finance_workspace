@@ -6,6 +6,7 @@
 > - 2026-05-24: Added `docs/setup.md` (local Postgres bring-up via docker-compose). — P1.1.
 > - 2026-05-24: Scaffolded `backend-python/app/` (FastAPI app, settings, DB wiring, `/health`) + Alembic (`backend-python/alembic/`). — P1.2.
 > - 2026-05-24: Scaffolded `backend-ts/` (NestJS parity twin: `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger` OpenAPI at `/openapi.json`, TypeORM `synchronize: false`, `GET /health` → `{"status":"ok"}`). — P1.3.
+> - 2026-05-24: Built the cross-backend **parity harness** in `contracts/` (Vitest): `npm run test:parity` boots BOTH backends (FastAPI :8765, NestJS :3765 — never :8000), polls `/health` for the real `{"status":"ok"}` body, asserts response parity + structural OpenAPI parity for `/health` against a canonical contract, then tears both down. — P1.4.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -36,8 +37,18 @@ personal_finance/
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
-├── contracts/                 # Canonical OpenAPI spec + cross-backend parity tests
+├── contracts/                 # Cross-backend PARITY HARNESS (Node + Vitest) — enforces Rule #1
+│   ├── openapi.canonical.json #   Canonical contract (agreed shape per endpoint; grows over time)
+│   ├── src/                   #   backends.ts (spawn/poll/teardown both backends; rogue-:8000 guard) ·
+│   │                          #     global-setup.ts (Vitest globalSetup: boot both, provide base URLs,
+│   │                          #     teardown) · normalize.ts (OpenAPI structural normalizer) · http.ts
+│   ├── test/                  #   health-response.parity · openapi.parity (structural) ·
+│   │                          #     normalize.unit · backends.unit
+│   ├── package.json           #   script `test:parity` (canonical gate; pretest builds both backends)
+│   ├── vitest.config.ts        #   globalSetup + single-fork · vitest.unit.config.ts (units, no boot)
+│   ├── tsconfig.json · README.md · .gitignore
 │
+
 ├── scripts/                   # Statement ingestion utilities: extract_chase_statements.py (PDF→CSV),
 │                              #   ledger.py (per-source normalizers + combined signed-amount ledger)
 ├── tests/                     # Tests for scripts/ (root uv project; conftest.py wires scripts/ onto path)
@@ -66,4 +77,4 @@ See `.claude/rules/data-privacy.md`.
 
 ## Status
 
-Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2), and the **NestJS backend scaffold** (`backend-ts/`) exposing the same `GET /health` → `{"status":"ok"}` plus OpenAPI at `/openapi.json` (P1.3). The `frontend/` and `contracts/` trees are scaffolding placeholders pending the remaining P1+ phases in `plans/agent_checklist.md`.
+Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2), the **NestJS backend scaffold** (`backend-ts/`) exposing the same `GET /health` → `{"status":"ok"}` plus OpenAPI at `/openapi.json` (P1.3), and the **cross-backend parity harness** (`contracts/`, P1.4) whose `npm run test:parity` boots both backends, asserts response + structural-OpenAPI parity for `/health` against a canonical contract, and tears them down. The `frontend/` tree is a scaffolding placeholder pending the remaining P1+ phases in `plans/agent_checklist.md`.
