@@ -113,7 +113,7 @@ uv run pytest
 
 ## Rule & skill index
 
-**Rules** (`.claude/rules/`): `backend-parity` (Rule #1) · `data-privacy` · `python` · `typescript` · `testing_python` · `testing_typescript` · `testing_frontend` · `frontend_tailwind` · `web_design_best_practices` · `api-data-pulls` · `branching` · `structure-on-merge` · `mermaid`.
+**Rules** (`.claude/rules/`): `backend-parity` (Rule #1) · `data-privacy` · `python` · `typescript` · `testing_python` · `testing_typescript` · `testing_frontend` · `frontend_tailwind` · `web_design_best_practices` · `api-data-pulls` · `branching` · `structure-on-merge` · `pull-requests` · `mermaid`.
 
 **Skills** (`.claude/skills/`): `checklist-phase-runner` · `checklist-phase-runner-parallel` · `branch-finalization` · `parity-auditor` · `bug-hunter` · `devils-advocate`.
 
