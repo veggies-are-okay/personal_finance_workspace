@@ -1,0 +1,18 @@
+EARNINGS RATE HOURS CURRENT YTD
+Salary - 86.67 $5,500.00 $11,000.00
+401K (Pre-tax) $550.00 $110.00 $1,100.00 $220.00
+EMPLOYEE TAXES WITHHELD CURRENT YTD
+Federal Income Tax $760.00 $1,520.00
+Medicare Tax $79.75 $159.50
+Social Security $341.00 $682.00
+California SDI $66.00 $132.00
+California State Tax $300.00 $600.00
+EMPLOYER TAXES CURRENT YTD
+Employer Medicare Tax $79.75 $159.50
+Social Security - Employer $341.00 $682.00
+SUMMARY CURRENT YTD
+Gross Pay $5,500.00 $11,000.00
+Deductions $625.00 $1,250.00
+Taxes $1,546.75 $3,093.50
+Employer Taxes $420.75 $841.50
+Net Pay $3,328.25 $6,656.50

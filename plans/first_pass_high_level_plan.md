@@ -2,6 +2,7 @@
 
 > CHANGELOG
 > - 2026-05-24: Initial plan. Establishes the dual-backend (FastAPI + NestJS) parity architecture, the React/Vite/Tailwind frontend, shared Postgres, and the build phases. — Foundation pass.
+> - 2026-05-24: Added the **data-connectors & frontend** program — backend-owned Plaid/RentCast adapters behind a stable source/view contract, a loosely-coupled 7-screen frontend, contract-first 3-wave execution. Live API integration moved from "non-goal" into scope (local-first, swappable adapters). See `docs/2026-05-24-data-connectors-and-frontend-design.md`. — Connectors pass.
 
 ## Goal
 
@@ -26,19 +27,20 @@ Building each feature twice (Python and TypeScript) is the point — it is how w
 
 Raw statements → `scripts/` ingestion (normalize per-source formats + sign conventions; validate against invariants) → normalized CSVs → loaded into Postgres → served by either backend → rendered by the frontend.
 
-## Build phases (see `plans/agent_checklist.md` for tasks)
+## Build phases (see `plans/agent_checklist.md` for tasks, `plans/checklist_flow.md` for stages)
 
-- **P0 — Foundations:** repo skeleton, rules, skills, ingestion utilities. *(in progress)*
-- **P1 — Infra & scaffolds:** Postgres compose, both backend scaffolds, frontend scaffold, healthchecks.
-- **P2 — Data model:** Alembic schema (accounts, transactions, categories, budgets, loans, goals) + mirrored TypeORM entities.
-- **P3 — Ingestion → DB:** load normalized CSVs into Postgres; idempotent re-import.
-- **P4 — Transactions API:** list/search/categorize endpoints in **both** backends + `contracts/` parity tests.
-- **P5 — Budgeting API:** budgets vs. actuals, both backends + parity.
-- **P6 — Net worth API:** accounts/balances/net-worth-over-time, both backends + parity.
-- **P7 — Planning API:** loan tranches, payoff strategies, goals, both backends + parity.
-- **P8 — Frontend:** dashboard, transactions, budget, net worth, planning screens.
-- **P9 — Parity harness & hardening:** OpenAPI diff in CI, contract coverage, degraded/edge cases.
+**P0–P1 (done):** repo skeleton, rules/skills, ingestion utilities, Postgres, both backend scaffolds, parity harness, frontend scaffold.
 
-## Non-goals (MVP)
+The data-connectors program runs in **3 waves** (contract-first, vertical slicing, one PR per track):
 
-Multi-user, cloud deployment, live brokerage/bank API integrations (may come later as a spike), and mobile apps.
+- **Wave 0 — Foundation (P2):** rewrite CI (4 gated jobs + Postgres + branch protection) + repo hygiene; author the canonical OpenAPI (view + source + connections endpoints) + a Prism mock; DB schema incl. encrypted Plaid Item store.
+- **Wave 0.5 — Ingestion + precompute (P3):** load the normalized ledger; **precompute** categorization / 50-30-20 / recurring / aggregates in Python so both backends serve thin reads (keeps parity trivial).
+- **Wave 1 — View endpoints + frontend (P4–P5):** six view endpoints (`/transactions`, `/budget`, `/networth`, `/investments`, `/debt`, `/goals`) in **both** backends + parity, served from precomputed tables; the 7 screens grouped into two FE tracks built against the mock, then wired.
+- **Wave 2 — Live connectors (P6):** connections/token lifecycle + encrypted Item store; Plaid adapter (transactions/liabilities/investments/income) and RentCast adapter swapped in **behind the same endpoints** via the Settings Local↔API toggle.
+- **Wave 3 — Hardening (P7):** docker dual-frontend (8501→python, 8502→ts), exhaustive parity/OpenAPI coverage, security review of token handling.
+
+## In scope vs deferred / non-goals
+
+- **Now in scope:** local-first **live API integration** via swappable backend adapters (Plaid-primary, RentCast), built/CI'd on Plaid Sandbox.
+- **Deferred to its own spec:** the **LangGraph + Gemini Flash Lite analysis client** (AI insight cards).
+- **Non-goals (MVP):** Plaid Production / hosting, multi-user, cloud deployment, mobile apps.

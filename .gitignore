@@ -23,6 +23,8 @@ images/**/*
 # .mcp.json holds a real API key locally; commit .mcp.json.example instead.
 .mcp.json
 .claude/settings.local.json
+# Agent worktrees (created by isolated subagents; never commit)
+.claude/worktrees/
 # Cursor is not used here (rules live in .claude/rules/); never commit it.
 .cursor/
 

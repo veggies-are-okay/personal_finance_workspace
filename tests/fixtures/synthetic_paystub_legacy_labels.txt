@@ -1,0 +1,21 @@
+EARNINGS RATE HOURS CURRENT YTD
+Salary - 80.00 $5,000.00 $40,000.00
+Annual Bonus - - $1,000.00 $1,000.00
+Medical Deductions $100.00 $200.00 $1,000.00 $1,600.00
+401K (Pre-tax) $500.00 $100.00 $4,000.00 $800.00
+EMPLOYEE TAXES WITHHELD CURRENT YTD
+Federal Income Tax $700.00 $5,600.00
+Medicare $87.00 $600.00
+Social Security $372.00 $2,542.00
+SDI Withholding - CA $60.00 $410.00
+State Withholding - CA $181.00 $1,848.00
+EMPLOYER TAXES CURRENT YTD
+Employer Medicare Tax $90.00 $640.00
+Social Security - Employer $375.00 $2,560.00
+SUMMARY CURRENT YTD
+Gross Pay $6,000.00 $41,000.00
+Reimbursements $50.00 $400.00
+Deductions $600.00 $5,000.00
+Taxes $1,400.00 $11,000.00
+Employer Taxes $400.00 $3,000.00
+Net Pay $4,050.00 $25,400.00
