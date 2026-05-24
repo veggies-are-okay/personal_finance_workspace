@@ -21,7 +21,7 @@
   - *Verify:* `uv run pytest tests/test_extract_chase_statements.py` passes (parsed purchases == printed summary total).
 
 ### P0.3 — Ingestion: remaining sources
-- [ ] Normalizers for `amex.csv`, `checking.csv`, `elan_credit_card.csv` onto the canonical signed-amount ledger schema (`.claude/rules/api-data-pulls.md`).
+- [x] Normalizers for `amex.csv`, `checking.csv`, `elan_credit_card.csv` onto the canonical signed-amount ledger schema (`.claude/rules/api-data-pulls.md`).
   - *Verify:* unit tests on **synthetic** fixtures assert correct sign normalization per source; a combined loader merges all sources into one ledger.
 
 ---

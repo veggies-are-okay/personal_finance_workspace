@@ -5,6 +5,7 @@ extract must equal the "Purchases +$..." figure Chase prints in the account
 summary. This is checked against the real PDFs committed under
 ``docs/bank_statements/chase_pdf_statements``.
 """
+
 from datetime import date
 from decimal import Decimal
 
