@@ -33,7 +33,7 @@
   - *Verify:* `docker compose ps` healthy; `psql`/driver connects with `DATABASE_URL`.
 
 ### P1.2 — backend-python scaffold (FastAPI)
-- [ ] `app/main.py` FastAPI app, settings via pydantic-settings, `/health` endpoint, Alembic initialized.
+- [x] `app/main.py` FastAPI app, settings via pydantic-settings, `/health` endpoint, Alembic initialized.
   - *Verify:* `uv run uvicorn app.main:app` serves `GET /health` → 200; quality gate (ruff+format+pytest ≥80%) passes.
 
 ### P1.3 — backend-ts scaffold (NestJS)

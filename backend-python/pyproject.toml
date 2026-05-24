@@ -31,3 +31,4 @@ line-length = 100
 [tool.pytest.ini_options]
 addopts = "--cov=app --cov-report=term-missing:skip-covered --cov-branch --cov-fail-under=80"
 testpaths = ["tests"]
+pythonpath = ["."]
