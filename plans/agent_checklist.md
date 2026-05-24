@@ -29,7 +29,7 @@
 ## P1 — Infra & scaffolds
 
 ### P1.1 — Postgres
-- [ ] `docker compose up -d` brings up Postgres; connection works from host.
+- [x] `docker compose up -d` brings up Postgres; connection works from host.
   - *Verify:* `docker compose ps` healthy; `psql`/driver connects with `DATABASE_URL`.
 
 ### P1.2 — backend-python scaffold (FastAPI)

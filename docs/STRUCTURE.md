@@ -3,6 +3,7 @@
 > CHANGELOG
 > - 2026-05-24: Initial structure. Foundation skeleton, rule/skill libraries, ingestion utilities. — Foundation pass.
 > - 2026-05-24: Added `scripts/ledger.py` (multi-source normalizers + combined loader) and `tests/fixtures/` (synthetic CSV fixtures). — P0.3.
+> - 2026-05-24: Added `docs/setup.md` (local Postgres bring-up via docker-compose). — P1.1.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -26,7 +27,7 @@ personal_finance/
 │   └── fixtures/              # Small SYNTHETIC CSV fixtures for ingestion tests (never real data)
 │
 ├── config/                    # accounts.example.yaml (committed) + accounts.yaml (gitignored)
-├── docs/                      # Committed markdown docs + GITIGNORED real data (see below)
+├── docs/                      # Committed markdown docs (STRUCTURE.md, setup.md) + GITIGNORED real data (see below)
 ├── images/                    # GITIGNORED financial screenshots
 ├── plans/                     # agent_checklist.md, first_pass_high_level_plan.md, checklist_flow.md
 ├── pull_requests/             # PR description docs (<slug>.md)
