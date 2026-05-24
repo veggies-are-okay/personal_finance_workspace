@@ -1,6 +1,6 @@
 ---
 name: checklist-phase-runner-parallel
-description: Staged parallel runner over plans/agent_checklist.md using plans/checklist_flow.md for the dual-backend personal-finance app. Runs one stage at a time; within each stage launches multiple general-purpose subagents (Agent/Task tool) in parallel for independent subsections (each implements both backends + contracts at strict 1:1 parity and pushes its branch), then the meta-runner merges branches in the defined order and updates the checklist_flow running tally. Use when the user wants "run the checklist in parallel," "run by stage," "parallel phase runner," or "checklist flow."
+description: Staged parallel runner over plans/agent_checklist.md using plans/checklist_flow.md for the dual-backend personal-finance app. Runs one stage at a time; within each stage launches multiple general-purpose subagents (Agent/Task tool) in parallel for independent subsections (each implements both backends + contracts at strict 1:1 parity and pushes its branch), then the meta-runner ships them as CI-gated pull requests (via the branch-finalization skill), merging on green in the defined order, and updates the checklist_flow running tally. Use when the user wants "run the checklist in parallel," "run by stage," "parallel phase runner," or "checklist flow."
 ---
 
 # Checklist Phase Runner (Parallel by Stage)
@@ -18,6 +18,8 @@ The project is a **local-first, single-user personal-finance app** with one fron
 - Shared Postgres via `docker-compose.yml` at the repo root.
 
 **RULE #1 — BACKEND PARITY:** every route, request/response schema, validation rule, error shape, and status code is implemented IDENTICALLY in both backends, in the SAME branch. Verified by OpenAPI diff + `contracts/` parity tests. Never let the backends drift.
+
+**INTEGRATION (supersedes the local `git merge --no-ff` / `git push origin main` steps below):** `main` is **protected** — PR-only, and the four CI checks must be green before merge. The meta-runner finalizes each stage's branches via the **`branch-finalization`** skill: push → open a CI-gated PR per branch (`gh pr create --base main`) → **merge on green** in the stage's defined order (`gh pr merge --merge --delete-branch`) → re-verify parity on `main`. **Never local-merge to `main`** (protection rejects it). See `.claude/rules/pull-requests.md`.
 
 **Flow source:** `plans/checklist_flow.md` (stages, merge order, running tally).
 **Checklist source:** `plans/agent_checklist.md` (subsection headings, tasks, slugs).

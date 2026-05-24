@@ -11,6 +11,8 @@
 
 **Parity rule for every API task:** the change exists in FastAPI **and** NestJS; `contracts/` has an added/updated parity test; the OpenAPI structural diff vs `openapi.canonical.json` is clean; money/date/enum/null follow Appendix A. Stage-4 branches **must not edit** `openapi.canonical.json` (frozen in P2.2 — DA-25).
 
+**Integration:** every subsection ships via the `branch-finalization` skill as a **CI-gated PR** into the protected `main` (push → PR → merge only on green) — never a local merge (`.claude/rules/pull-requests.md`).
+
 ---
 
 ## P0 — Foundations

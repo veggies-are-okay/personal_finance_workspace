@@ -1,6 +1,6 @@
 ---
 name: checklist-phase-runner
-description: Meta-runner that iterates through plans/agent_checklist.md by subsection for the dual-backend personal-finance app. For whole-checklist runs, launches one general-purpose subagent (Agent/Task tool) per subsection with full rules in the prompt, then automatically starts the next subsection in a fresh context until all are done or BLOCKED. Each subsection implements API/behavior changes in BOTH backends (FastAPI + NestJS) at strict 1:1 parity, updates contracts/, runs all relevant quality gates plus the parity gate, then merges to main. Use when the user wants to "run the checklist by phase," "do the next phase," or "iterate through the agent checklist."
+description: Meta-runner that iterates through plans/agent_checklist.md by subsection for the dual-backend personal-finance app. For whole-checklist runs, launches one general-purpose subagent (Agent/Task tool) per subsection with full rules in the prompt, then automatically starts the next subsection in a fresh context until all are done or BLOCKED. Each subsection implements API/behavior changes in BOTH backends (FastAPI + NestJS) at strict 1:1 parity, updates contracts/, runs all relevant quality gates plus the parity gate, then ships it via a CI-gated pull request using the branch-finalization skill. Use when the user wants to "run the checklist by phase," "do the next phase," or "iterate through the agent checklist."
 ---
 
 # Checklist Phase Runner
@@ -14,6 +14,8 @@ This skill drives `plans/agent_checklist.md` one subsection at a time for a **lo
 - `contracts/` — canonical OpenAPI spec + cross-backend parity tests.
 
 **RULE #1 — BACKEND PARITY:** every route, request/response schema, validation rule, error shape, and status code is implemented IDENTICALLY in both backends, in the SAME branch. Verified by OpenAPI diff + `contracts/` parity tests. Never let the backends drift.
+
+**INTEGRATION (supersedes the local `git merge --no-ff` steps below):** `main` is **protected** — PR-only, and the four CI checks (`python-backend`, `ts-backend`, `frontend`, `parity`) must be green before merge. Finalize each subsection's branch via the **`branch-finalization`** skill: push the branch → open a CI-gated PR (`gh pr create --base main`) → **merge on green** (`gh pr merge --merge --delete-branch`). **Never local-merge to `main`** (protection rejects it). See `.claude/rules/pull-requests.md`.
 
 ## Meta-runner mode (default for "run the whole checklist")
 
