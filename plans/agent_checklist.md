@@ -32,7 +32,7 @@
 ## P2 — Engineering foundation
 
 ### P2.1 — CI rewrite + repo hygiene  *(type: DEPLOY)*
-- [ ] Replace `.github/workflows/ci.yml` with four jobs, each in its **own working directory** (two uv projects exist — the Python *backend* is `backend-python/`, not repo root): `python-backend` (`backend-python/`), `ts-backend` (`backend-ts/`), `frontend` (`frontend/`), `parity` (`contracts/`). Add a **Postgres service container**; run `alembic upgrade head` before backend/integration tests. Drop alpha `ty`. Remove stray `backend-ts/src 2/` and `docs/Untitled`; commit `.github/`. Add `.env.example` keys (`PLAID_CLIENT_ID/SECRET/ENV`, `RENTCAST_API_KEY`, `APP_ENCRYPTION_KEY`, `DATABASE_URL`); confirm `.env` is gitignored. (DA-15/16/17/26)
+- [x] Replace `.github/workflows/ci.yml` with four jobs, each in its **own working directory** (two uv projects exist — the Python *backend* is `backend-python/`, not repo root): `python-backend` (`backend-python/`), `ts-backend` (`backend-ts/`), `frontend` (`frontend/`), `parity` (`contracts/`). Add a **Postgres service container**; run `alembic upgrade head` before backend/integration tests. Drop alpha `ty`. Remove stray `backend-ts/src 2/` and `docs/Untitled`; commit `.github/`. Add `.env.example` keys (`PLAID_CLIENT_ID/SECRET/ENV`, `RENTCAST_API_KEY`, `APP_ENCRYPTION_KEY`, `DATABASE_URL`); confirm `.env` is gitignored. (DA-15/16/17/26)
   - *Verify:* on a no-op PR all four jobs run **green** using the Appendix B commands; `git check-ignore .env` passes; `backend-ts/src 2/` and `docs/Untitled` gone; **branch protection** (GitHub repo setting — documented in the PR doc) requires all four checks before merge to `main`.
 
 ### P2.2 — Canonical API contract & mock  *(type: BE — contracts only; authored FIRST, then frozen)*

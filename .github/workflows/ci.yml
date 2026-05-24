@@ -1,0 +1,179 @@
+# CI for the dual-backend personal-finance app.
+#
+# Four independent jobs, each pinned to the correct working directory. NOTE the
+# repo has TWO uv projects: the repo root (ingestion scripts) and backend-python/
+# (the FastAPI service). The python-backend job runs from backend-python/, NOT
+# the root. Gate commands mirror Appendix B of plans/agent_checklist.md exactly.
+#
+# Jobs that touch the database get a Postgres 16 service container with the
+# docker-compose defaults (pf / pf / personal_finance) and run a guarded
+# `alembic upgrade head` (no-op while there are no migrations yet).
+#
+# Branch protection (a GitHub repo SETTING, not YAML) must require all four
+# checks before merge to main — see pull_requests/ci-rewrite-hygiene.md.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-backend:
+    name: python-backend (FastAPI)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-python
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pf
+          POSTGRES_PASSWORD: pf
+          POSTGRES_DB: personal_finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pf -d personal_finance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pf:pf@localhost:5432/personal_finance
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv (Python 3.12)
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Apply migrations (guarded — no-op when none exist)
+        run: |
+          if ls alembic/versions/*.py >/dev/null 2>&1; then
+            uv run alembic upgrade head
+          else
+            echo "No Alembic migrations yet; skipping upgrade."
+          fi
+
+      - name: Quality gate (ruff + format + pytest >=80%)
+        run: >-
+          uv run ruff check . &&
+          uv run ruff format --check . &&
+          uv run pytest --cov=app --cov-report=term-missing:skip-covered --cov-branch --cov-fail-under=80
+
+  ts-backend:
+    name: ts-backend (NestJS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-ts
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend-ts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality gate (lint + format + test:cov >=80%)
+        run: npm run lint && npm run format:check && npm run test:cov
+
+  frontend:
+    name: frontend (React + Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality gate (lint + test --coverage + build)
+        run: npm run lint && npm run test -- --coverage && npm run build
+
+  parity:
+    name: parity (both backends + OpenAPI diff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pf
+          POSTGRES_PASSWORD: pf
+          POSTGRES_DB: personal_finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pf -d personal_finance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pf:pf@localhost:5432/personal_finance
+    steps:
+      - uses: actions/checkout@v5
+
+      # The parity harness boots BOTH backends, so the job needs both toolchains:
+      # uv (FastAPI via uvicorn) and Node (NestJS built to dist/, plus the
+      # contracts harness itself). `npm run test:parity` runs `build:backends`
+      # first (uv sync + nest build) via the pretest:parity hook.
+      - name: Set up uv (Python 3.12)
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Sync backend-python deps
+        working-directory: backend-python
+        run: uv sync
+
+      - name: Apply migrations (guarded — no-op when none exist)
+        working-directory: backend-python
+        run: |
+          if ls alembic/versions/*.py >/dev/null 2>&1; then
+            uv run alembic upgrade head
+          else
+            echo "No Alembic migrations yet; skipping upgrade."
+          fi
+
+      - name: Install backend-ts deps
+        working-directory: backend-ts
+        run: npm ci
+
+      - name: Install contracts harness deps
+        run: npm ci
+
+      - name: Parity gate (boots both backends + structural OpenAPI diff)
+        run: npm run test:parity
