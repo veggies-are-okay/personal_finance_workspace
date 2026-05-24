@@ -49,10 +49,18 @@ body other than `{"status":"ok"}`), so a misconfigured port can't silently pass.
 - **`test/openapi.parity.test.ts`** — OpenAPI **structural** parity. Byte-equality is
   not expected (FastAPI emits 3.1, NestJS 3.0.x, different `$ref` names). Each document
   is normalized (see below) and the `/health` operation is checked for: same path, same
-  method, same success status (200), and an equivalent success schema (object with a
-  required string `status`). Both backends are also asserted to conform to the canonical
-  contract.
+  method, same success status (200), and an equivalent success schema. The generic
+  structural-diff loop then asserts both backends match the canonical for every
+  **implemented** operation (`IMPLEMENTED_PATHS`); **pending** operations are reported as
+  skipped, and a guard asserts the canonical doc declares the complete frozen inventory.
+- **`test/endpoints.parity.stubs.test.ts`** — per-endpoint **value-parity stubs**
+  (`it.todo`) for every not-yet-implemented view/source/connections endpoint; each names
+  the concrete same-request→same-body / error / empty / degraded assertion a Stage-4 `BE`
+  branch must fill in.
 - **`test/normalize.unit.test.ts`** — pure unit tests for the normalizer.
+- **`test/contract.unit.test.ts`** — pure unit tests for the contract loader: the frozen
+  path inventory, the implemented/pending partition, and the Appendix A conventions baked
+  into the reusable components.
 - **`test/backends.unit.test.ts`** — pure unit tests for the health-poll guard
   (including the `{"status":"healthy"}` rogue-process rejection).
 
@@ -66,21 +74,56 @@ It walks **every** path + method, so new endpoints are auto-covered.
 
 ## Canonical contract (`openapi.canonical.json`)
 
-The agreed source-of-truth shape. The parity test asserts **both** backends conform to
-it structurally. Keep it minimal; it grows one operation at a time.
+The agreed source-of-truth shape. As of **P2.2 this contract is COMPLETE and FROZEN**
+(DA-25): it declares **every** path the program will serve — view
+(`/api/v1/{transactions,budget,networth,investments,debt,goals}`), source
+(`/api/v1/sources/*`), and connections (`/api/v1/connections/*`) — plus `/health`.
+It bakes in the **Appendix A** conventions as reusable components:
 
-## Adding a new endpoint's parity test
+- `Money` — 2dp decimal **string** (`"123.45"`), never a JSON number.
+- `Percentage` — JSON **number** on a 0–100 scale.
+- `Date` / `DateTime` — `YYYY-MM-DD` / ISO-8601 UTC `…Z`.
+- `Pagination` — `{ data, pagination{ limit, offset, total } }` (never a top-level array).
+- The enum registry — `Bucket`, `Source`, `SourceMode`, `ItemStatus`, `LoanPriority`, `PayoffStrategy`.
+- `Error` — the one canonical error envelope `{"error":{code,message,details[]}}` (validation → **422**).
 
-When an endpoint is added to **both** backends (same branch, per Rule #1):
+All example values are **synthetic**. Stage-4 endpoint branches **must not edit this file**
+(contract-first; each adds only its implementation + flips an allowlist entry).
 
-1. **Add the operation to `openapi.canonical.json`** — path, method, success status,
-   and the success-response JSON schema (object/array, `required`, property types).
-2. **Response parity:** the structural OpenAPI test already loops over every canonical
-   operation and asserts both backends match — so it is auto-covered. For
-   behavior/value parity (specific request → specific body), add a small test in
-   `test/` that hits the same path on both `inject('pyBase')` and `inject('tsBase')`
-   and compares the responses to each other (use `getJson` from `src/http.ts`).
-3. Run `npm run test:parity`. Both backends boot, and the new operation is checked
-   structurally on both plus against the canonical contract.
+### Lint + mock
+
+```bash
+npm run lint:openapi     # redocly lint (config: redocly.yaml) — must be clean
+npm run mock             # prism mock openapi.canonical.json (serves example bodies)
+```
+
+The Prism mock is what the frontend develops against (DA-21): it serves the contract's
+examples, so a `curl` to any path returns an Appendix-A-conformant body without any
+backend running.
+
+## Implemented vs pending — `src/contract.ts`
+
+Because the contract is frozen-and-complete but the backends implement it one `BE`
+branch at a time, `src/contract.ts` holds an **`IMPLEMENTED_PATHS`** allowlist of the
+operations that are LIVE in both backends today (only `GET /health` at P2.2). The
+structural-diff test scopes its strict cross-backend assertion to that set; **pending**
+operations are reported as `skip`/`todo` so the gate never fails just because the
+canonical doc lists a not-yet-built route.
+
+## Adding a new endpoint's parity test (Stage-4 `BE` branch)
+
+When an endpoint is implemented in **both** backends (same branch, per Rule #1):
+
+1. **Do NOT touch `openapi.canonical.json`** — the operation is already declared there.
+2. Add its `"<METHOD> <path>"` key to **`IMPLEMENTED_PATHS`** in `src/contract.ts`. The
+   generic structural-diff test in `test/openapi.parity.test.ts` then asserts both
+   backends match the canonical op (and each other) — auto-covered, no per-endpoint code.
+3. Fill in the matching **value-parity** stub in `test/endpoints.parity.stubs.test.ts`
+   (replace `it.todo(...)` with a real `it(...)`): hit the same path on both
+   `inject('pyBase')` and `inject('tsBase')` (use `getJson` from `src/http.ts`), assert
+   the two bodies equal each other AND satisfy Appendix A (money string, percentage
+   number, datetime `…Z`, pagination envelope, omit-absent), plus the error/empty/degraded
+   cases the checklist Verify names.
+4. Run `npm run test:parity`. Both backends boot and the new operation is checked.
 
 No real financial data anywhere — synthetic only.

@@ -1,21 +1,19 @@
 /**
- * OpenAPI structural parity for /health.
+ * OpenAPI structural parity (canonical contract vs both live backends).
  *
  * FastAPI emits OpenAPI 3.1 and NestJS emits 3.0.x with different `$ref` names,
  * titles, and examples, so byte-equality is NOT expected. Instead we normalize
- * each document (see src/normalize.ts) and assert the `/health` GET operation
- * is structurally equivalent across BOTH backends and the canonical contract:
- * same path, same method (GET), same success status (200), and an equivalent
- * success schema (object with required string `status`).
+ * each document (see src/normalize.ts) and compare the structural essence of
+ * each operation (path, method, success status, success schema).
  *
- * The normalizer walks EVERY path/method, so adding a new endpoint to both
- * backends + openapi.canonical.json is auto-covered by the same structural
- * comparison below.
+ * The canonical contract (openapi.canonical.json) is FROZEN and COMPLETE at
+ * P2.2 (DA-25): it already declares every path the program will serve. The
+ * backends implement those paths one `BE` branch at a time, so the strict
+ * cross-backend check below is scoped to `IMPLEMENTED_PATHS` (see src/contract.ts) —
+ * the single non-frozen knob a Stage-4 branch flips when it ships an endpoint.
+ * Pending (not-yet-implemented) operations are reported as skipped, so this
+ * gate cannot fail just because the canonical doc lists a not-yet-built route.
  */
-
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 
 import { inject, beforeAll, describe, expect, it } from "vitest";
 
@@ -24,11 +22,15 @@ import {
   normalizeApi,
   normalizeOperation,
   type NormalizedApi,
+  type NormalizedOperation,
   type OpenApiDocument,
 } from "../src/normalize";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const CANONICAL_PATH = resolve(HERE, "..", "openapi.canonical.json");
+import {
+  IMPLEMENTED_PATHS,
+  loadCanonical,
+  opKey,
+  partitionOperations,
+} from "../src/contract";
 
 const pyBase = inject("pyBase");
 const tsBase = inject("tsBase");
@@ -44,9 +46,7 @@ beforeAll(async () => {
   ]);
   pyDoc = py.json as OpenApiDocument;
   tsDoc = ts.json as OpenApiDocument;
-  canonical = JSON.parse(
-    readFileSync(CANONICAL_PATH, "utf8"),
-  ) as OpenApiDocument;
+  canonical = loadCanonical();
 });
 
 describe("/health — OpenAPI structural parity", () => {
@@ -90,26 +90,82 @@ describe("/health — OpenAPI structural parity", () => {
     expect(py).toEqual(canonicalOp);
     expect(ts).toEqual(canonicalOp);
   });
+});
 
-  it("every operation in the canonical contract is matched by both backends", () => {
-    // Future-proofing: as endpoints are added to openapi.canonical.json + both
-    // backends, this loop auto-covers them with the same structural check.
+describe("canonical contract — structural diff vs both backends", () => {
+  /**
+   * Strict structural conformance, scoped to IMPLEMENTED endpoints only.
+   * For each live operation: the canonical op exists, and BOTH backends match
+   * it (and therefore each other). As Stage-4 branches add their path to
+   * IMPLEMENTED_PATHS this loop auto-covers them with no edit to the frozen
+   * OpenAPI. At P2.2 the only implemented operation is GET /health.
+   */
+  it("every IMPLEMENTED canonical operation is matched by both backends", () => {
     const canonicalApi: NormalizedApi = normalizeApi(canonical);
     const pyApi: NormalizedApi = normalizeApi(pyDoc);
     const tsApi: NormalizedApi = normalizeApi(tsDoc);
 
+    const implemented = [...IMPLEMENTED_PATHS];
+    expect(
+      implemented.length,
+      "at least /health must be implemented",
+    ).toBeGreaterThan(0);
+
     for (const path of Object.keys(canonicalApi)) {
       for (const method of Object.keys(canonicalApi[path])) {
-        const expected = canonicalApi[path][method];
+        if (!IMPLEMENTED_PATHS.has(opKey(method, path))) continue; // pending
+        const expected: NormalizedOperation = canonicalApi[path][method];
         expect(
           pyApi[path]?.[method],
-          `FastAPI missing ${method} ${path}`,
+          `FastAPI missing/diverged on ${method.toUpperCase()} ${path}`,
         ).toEqual(expected);
         expect(
           tsApi[path]?.[method],
-          `NestJS missing ${method} ${path}`,
+          `NestJS missing/diverged on ${method.toUpperCase()} ${path}`,
         ).toEqual(expected);
       }
     }
   });
+
+  it("the canonical contract declares the full P2.2 path inventory (frozen)", () => {
+    // Guards DA-25: the canonical doc must contain ALL view + source +
+    // connections paths up front so Stage-4 branches never edit it. This
+    // asserts the inventory is complete; it does NOT require the backends to
+    // implement them yet.
+    const { implemented, pending } = partitionOperations(canonical);
+    const all = [...implemented, ...pending];
+
+    const expectedInventory = [
+      opKey("GET", "/health"),
+      opKey("GET", "/api/v1/transactions"),
+      opKey("GET", "/api/v1/budget"),
+      opKey("GET", "/api/v1/networth"),
+      opKey("GET", "/api/v1/investments"),
+      opKey("GET", "/api/v1/debt"),
+      opKey("GET", "/api/v1/goals"),
+      opKey("GET", "/api/v1/sources/transactions"),
+      opKey("GET", "/api/v1/sources/income"),
+      opKey("GET", "/api/v1/sources/holdings"),
+      opKey("GET", "/api/v1/sources/loans"),
+      opKey("GET", "/api/v1/sources/listings"),
+      opKey("POST", "/api/v1/connections/link-token"),
+      opKey("POST", "/api/v1/connections/exchange"),
+      opKey("GET", "/api/v1/connections"),
+      opKey("POST", "/api/v1/connections/webhook"),
+    ].sort();
+
+    expect(all.sort()).toEqual(expectedInventory);
+  });
+
+  // Pending operations are surfaced (not silently dropped) as skipped todos so
+  // the gate output shows exactly which contract paths still await a backend.
+  const { pending } = partitionOperations(loadCanonical());
+  for (const key of pending) {
+    it.skip(`PENDING backend impl + parity: ${key}`, () => {
+      // Filled in by the Stage-4 BE branch that implements this endpoint:
+      // 1. implement in backend-python + backend-ts,
+      // 2. add `${key}` to IMPLEMENTED_PATHS in src/contract.ts,
+      // 3. the strict structural check above then covers it automatically.
+    });
+  }
 });
