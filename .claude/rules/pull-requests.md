@@ -1,45 +1,71 @@
-# Pull Requests & README Maintenance
+# Pull Requests, Review & README Maintenance
 
-Applies to every PR into `main`. `main` is protected: PR-based merges only, and all four CI checks (`python-backend`, `ts-backend`, `frontend`, `parity`) must be green before merge (`.github/workflows/ci.yml`). The PR body is mirrored to `pull_requests/<slug>.md` (see `branching.md`, `structure-on-merge.md`, and the `branch-finalization` skill). **No real financial data** in any PR body, screenshot, log, or PR doc — synthetic only (`data-privacy.md`).
+The reference for **how PRs are authored, verified, and reviewed**, and **how READMEs stay alive**. The `branch-finalization` skill **executes** this rule end-to-end. `main` is protected: **PR-based merges only**, and all four CI checks (`python-backend`, `ts-backend`, `frontend`, `parity`) must be green before merge (`.github/workflows/ci.yml`). **No real financial data** in any PR body, screenshot, log, or PR doc — synthetic only (`data-privacy.md`). See also `branching.md`, `structure-on-merge.md`, `backend-parity.md`.
 
-## 1. READMEs stay current (every PR)
+---
 
-- The repo has a **top-level `README.md`** and a **`README.md` in every first-level directory** that holds code or canonical content (`frontend/`, `backend-python/`, `backend-ts/`, `contracts/`, `scripts/`, `docs/`, `config/`, `plans/`, `tests/`).
-- **A PR must update the README of every area it touches.** If a PR adds/removes a module, command, env var, endpoint family, or changes how a component is run/tested, the relevant README(s) change in the **same PR**. (This is the same "docs on merge" discipline as `structure-on-merge.md`, applied to READMEs too.)
+## 1. README best practices & upkeep
 
-### README best practices
+The repo keeps a **top-level `README.md`** and a **README in every first-level directory** that holds code or canonical content. **Every PR updates the README of each area it touches** (same "docs on merge" discipline as `structure-on-merge.md`) — if a PR adds/removes a module, command, env var, endpoint family, or changes how a component runs/tests, the relevant README(s) change **in that PR**.
 
-**Top-level `README.md`:** one-paragraph what + why; the dual-backend-parity architecture in 2–3 sentences (+ a Mermaid diagram per `mermaid.md`); a **quickstart** (clone → `docker compose up -d` → run each component) with copy-pasteable commands; a **repo map** table linking to each component README and to `docs/STRUCTURE.md`, `plans/agent_checklist.md`, and `.claude/rules/`; the quality-gate + PR rules in brief.
+**Top-level README = navigation + map.** Ideal order: title → one-line what/why → highlights → quickstart (copy-pasteable) → usage → repo/component map (table linking each component README + `docs/STRUCTURE.md` + `plans/`) → requirements/config (env vars) → quality gates → contributing/PR rules → privacy note. Put "what is it / can I run it / what next / where's help" in the first screenful.
 
-**Component `README.md`** (each first-level dir): **Purpose** (one line); **Run & test** (exact commands, incl. the coverage gate); **Key files/modules** (short table); **How it fits** (its role in the parity architecture / data flow); **Gotchas** (e.g. "two uv projects", "`synchronize:false`", "money is a decimal string"). Keep it scannable; link to the spec/contract rather than duplicating.
+**Component README = local operating manual.** Each first-level dir: **Purpose** (one line) · **Run & test** (exact commands incl. the coverage gate) · **Key files** (short table) · **How it fits** (its role in the parity architecture / data flow) · **Gotchas** (e.g. "two uv projects", "`synchronize:false`", "money is a decimal string"). Link to the spec/contract rather than duplicating.
 
-Write the README a new contributor with zero repo context could follow. Prefer links over duplication; keep diagrams in Mermaid.
+**Keep them from rotting:** single source of truth; **link, don't duplicate** (root orients, component operates, deep workflows live in `docs/` and are linked); examples are copy-pasteable and current; stale sections are removed, not accumulated.
 
-## 2. PR description — scale detail to the change size
+**README review rubric:** first paragraph says what it is in plain language; answers what/why/how; commands are copy-pasteable and were recently true; prerequisites + env vars + ports match the code; links resolve; **no secrets or real data**; (monorepo) root has a component index and components don't duplicate shared setup. 60-second smell test: *what is this · can I run it · what next · where's help.*
 
-Count the files changed (`git diff --name-only main... | wc -l`) and pick the tier. **Always** map the technical change to the **high-level feature(s)** it serves (which screen / capability / checklist phase), not just "what changed."
+**Anti-patterns:** wall of text; missing quickstart; outdated commands/paths; duplicated instructions across READMEs (drift); no concrete examples; API dump instead of a guide; secrets/real data; broken links.
 
-| Tier | Files changed | Granularity of the "Changes" section |
-|------|---------------|--------------------------------------|
-| **Small** | **≤ 5** | Walk through **each individual file** — what it does and why. |
-| **Medium** | **6–10** | Group by **subdirectory / module**; summarize each group. |
-| **Large** | **> 10** | **High-level / conceptual by realm** (e.g. "the transactions read path", "the Plaid adapter") — discuss the design, not every file. |
+---
 
-Every PR body / `pull_requests/<slug>.md` includes: **H1 title · Summary · Changes (at the tier granularity) · Feature mapping (change → high-level feature) · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Keep under ~4000 chars.
+## 2. PR description — scale detail to change size
 
-## 3. Happy-path verification — *prove the feature works*
+Count files (`git diff --name-only main... | wc -l`) and pick the tier. **Always** map the change to the **high-level feature(s)** it serves (which screen / capability / checklist phase), not just "what changed." Keep PRs **focused** (one concern) and reasonably small.
 
-Beyond green gates, every feature-bearing PR shows **evidence the happy path actually works**, choosing the method(s) that fit the change. Capture artifacts under the PR doc (link images/log excerpts; synthetic data only).
+| Tier | Files | "Changes" granularity |
+|------|-------|-----------------------|
+| **Small** | **≤ 5** | Walk through **each individual file**. |
+| **Medium** | **6–10** | Group by **subdirectory / module**. |
+| **Large** | **> 10** | **High-level / conceptual by realm** — discuss the design, not every file. |
 
-| Change type | Required evidence (pick what fits) |
-|-------------|-------------------------------------|
-| **Frontend** (screen/flow) | A **Playwright screenshot** of the working screen/state (loading/empty/error covered where relevant), against the mock or a live backend. |
-| **Backend endpoint** | The **OpenAPI/Swagger** entry (FastAPI `/openapi.json`, NestJS `/openapi.json`) **+ a Playwright-MCP (or curl) ping** of the endpoint showing the expected response body/status. For a **parity** change, show **both** backends returning identical responses. |
-| **Infra / services** | **`docker compose` container logs** (services healthy) and/or **app log** screenshots showing the expected behavior. |
-| **Data / ingestion / DB** | Output of an **ad-hoc query script** (e.g. row counts, dedupe proof) or a log excerpt demonstrating the invariant. |
+Every PR body / `pull_requests/<slug>.md`: **H1 title · Summary · Changes (at tier granularity) · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Under ~4000 chars.
 
-Rules of thumb: prefer **observable behavior** (a real request/response, a rendered screen, a query result) over asserting internals; for any API/parity change, the verification must demonstrate the **shared contract** (same shape from both backends); never paste real balances/transactions/account numbers — use synthetic fixtures or redact.
+---
 
-## 4. Merge
+## 3. Happy-path verification — *prove it works*
 
-Open the PR (`gh pr create --base main`), let the four checks run, and **merge only on green** (branch protection enforces this). Finalize via the `branch-finalization` skill (gates → PR doc → commit → `--no-ff` merge). Update `docs/STRUCTURE.md` + READMEs in the same PR when layout changes.
+Beyond green gates, every feature-bearing PR shows **evidence the happy path works**, choosing the method(s) that fit (synthetic data only; link artifacts in the PR doc).
+
+| Change type | Evidence |
+|-------------|----------|
+| **Frontend** | A **Playwright screenshot** of the working screen/state (loading/empty/error where relevant), against the mock or a live backend. |
+| **Backend endpoint** | The **OpenAPI/Swagger** entry + a **Playwright-MCP (or curl) ping** showing the expected response/status. For a **parity** change, show **both** backends returning identical responses. |
+| **Infra / services** | **`docker compose` container logs** (services healthy) and/or **app log** screenshots showing expected behavior. |
+| **Data / ingestion / DB** | Output of an **ad-hoc query script** (row counts, dedupe proof) or a log excerpt demonstrating the invariant. |
+
+Prefer **observable behavior** (real request/response, rendered screen, query result) over asserting internals. Never paste real balances/transactions/account numbers.
+
+---
+
+## 4. Review (author self-review, then reviewer pass)
+
+**Author self-review before opening** (Google: fix everything you can first): read every changed file as a reviewer would; remove debug/dead/commented code; add inline comments where intent is non-obvious; confirm linters/formatters pass and no unrelated/whitespace churn; new behavior has meaningful tests (a bugfix has a test that fails without the fix); the PR description states what/why/how/risks + which gates were run.
+
+**Reviewer checklist** (the `branch-finalization` skill runs this — optionally via the `code-review` or `pr-review-toolkit:review-pr` skills):
+- **Correctness:** matches the spec/feature; edge cases + error conditions handled; **no silent failures** (no swallowed exceptions); external APIs used per contract.
+- **Tests:** meaningful (assert behavior, not "no exception"), readable, stable; bugfix has a failing-without-fix test; ≥80% coverage gate met.
+- **Readability/maintainability:** clear names; reasonable decomposition; comments explain *why*; no needless duplication; consistent with existing patterns.
+- **Parity (this repo):** API/behavior change exists in **both** backends + `contracts/` parity test + clean OpenAPI diff; money(decimal-string)/dates(ISO-Z)/enums/null match Appendix A of `agent_checklist.md`.
+- **Security:** no secrets/tokens/PII in code or logs; external input validated; parameterized queries; authz checked; errors don't leak internals. Mark as `issue(security, blocking)`.
+
+**Comment style — Conventional Comments** (`label(subject): discussion`): `issue` (blocking: correctness/security/major design), `suggestion`/`question`/`thought` (non-blocking), `nit` (trivial, never blocking). Be specific, give the *why* and a concrete alternative, stay kind.
+
+**Block only on** correctness, security, or major design problems. **Do NOT block on** style already enforced by linters, personal preference, or speculative refactors — mark those `nit`/`suggestion`.
+
+---
+
+## 5. Merge
+
+`gh pr create --base main` → ensure the **four checks are green** → merge (`gh pr merge --merge`). Branch protection enforces green-before-merge; the author may merge their own PR (solo repo, 0 required approvals) once checks pass and self/reviewer review is clean. Update `docs/STRUCTURE.md` + the touched READMEs **in the same PR** when layout/usage changed. The `branch-finalization` skill performs this flow.
