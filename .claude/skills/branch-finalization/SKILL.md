@@ -1,161 +1,105 @@
 ---
 name: branch-finalization
-description: End-of-branch workflow for the dual-backend personal-finance app. Runs preflight quality gates (both backend gates + frontend gate if touched + the cross-backend parity gate), gathers the diff, writes a PR doc, commits, merges to main with --no-ff, verifies, and optionally notifies. Aborts on any gate failure or backend parity drift. Local-only — never pushes unless the user asks; never amends; never uses --no-verify. Use when the user says "finalize branch," "merge this in," "wrap this up," "branch finalization," or "create a PR and merge."
+description: Use when work on a feature branch is complete and ready to integrate into main for the dual-backend personal-finance app — triggers include "finalize branch," "wrap this up," "open a PR," "create a PR and merge," "merge this in," or any point where a branch should become a reviewed, CI-gated pull request into the protected main.
 ---
 
 # Branch Finalization
 
-Automates the end-of-branch workflow for a **local-first, single-user personal-finance app**: run quality gates, update documentation, commit, write a PR doc, and merge into `main`.
+Takes a finished feature branch all the way to merged via a **reviewed, CI-gated pull request** into the **protected `main`**: preflight gates → README upkeep → self-review → PR (tiered description + happy-path proof) → reviewer pass → merge on green. This skill is the **executor** of `.claude/rules/pull-requests.md` (the conventions/checklists live there — read it; do not duplicate it here).
 
-The repo has one frontend and **TWO parallel backends kept at STRICT 1:1 parity** (a learning exercise):
+The repo has one frontend and **TWO parallel backends at STRICT 1:1 parity**: `frontend/` (React+Vite+Tailwind), `backend-python/` (FastAPI+Pydantic v2, uv, SQLAlchemy+Alembic — canonical schema), `backend-ts/` (NestJS+TypeORM `synchronize:false`+class-validator, npm), `contracts/` (canonical OpenAPI + parity tests), shared Postgres.
 
-- `frontend/` — React + Vite + Tailwind (TS), backend-neutral via `VITE_API_BASE_URL`.
-- `backend-python/` — FastAPI + Pydantic v2, `uv`, SQLAlchemy 2.0 + Alembic (canonical migrations), package `app`.
-- `backend-ts/` — NestJS + TypeORM (`synchronize:false`) + class-validator, `npm`, Jest + Supertest.
-- `contracts/` — canonical OpenAPI spec + cross-backend parity tests.
-- Shared Postgres via `docker-compose.yml` at the repo root.
+**RULE #1 — BACKEND PARITY:** every route/schema/validation/error/status implemented IDENTICALLY in both backends on this branch, verified by OpenAPI diff + `contracts/` parity tests. **Never finalize an API/behavior change unless both backend gates AND the parity gate pass.**
 
-**RULE #1 — BACKEND PARITY:** every route, request/response schema, validation rule, error shape, and status code must be implemented IDENTICALLY in both backends on this branch, verified by OpenAPI diff + `contracts/` parity tests. **Do not finalize a branch with API/behavior changes unless both backend gates AND the parity gate pass.**
+**`main` is protected** (PR-only; the four CI checks must be green before merge) and the repo has an `origin` remote. So this workflow **pushes the branch and merges via `gh`** — it is *not* local-only.
 
 ## When to Use
 
-- User says "finalize branch," "merge this in," "wrap this up," "branch finalization," or "create a PR and merge."
-- After completing a feature or fix on a feature branch and wanting to ship it to `main`.
-- When the user wants to document, commit, and merge in one step.
+- "Finalize branch," "wrap this up," "open a PR," "create a PR and merge," "merge this in."
+- After a checklist subsection / feature / fix is complete on a `{yyyy}-{mm}-{dd}-<TYPE>/<slug>` branch and ready for `main`.
 
 ## Prerequisites
 
-- You are on a feature branch (not `main`). Branches follow `{yyyy}-{mm}-{dd}-<TYPE>/<slug>` with `TYPE ∈ {FE, BE-PY, BE-TS, BE, DB, DOCS, DEPLOY, INFRA}` (e.g. `2026-05-24-BE/p4-2-debt-payoff-plan`).
-- All code changes are complete and ready to ship.
-- If the branch made API/behavior changes, they are already implemented in **both** backends and `contracts/` (OpenAPI + parity tests) is updated. If not, fix that before finalizing — parity is non-negotiable.
+- On a feature branch (not `main`). If on `main`, ask which branch to finalize.
+- Code changes complete; API/behavior changes already in **both** backends + `contracts/`.
 
 ## Workflow
 
-### Step 1: Preflight Gates (abort on any failure or parity drift)
+### Step 1 — Preflight gates (abort on any failure or parity drift)
 
-Run every gate that applies to what the branch touched. **80% coverage is a hard floor on each.** This is local-only — do not push.
+Run every gate that applies to what the branch touched (80% coverage is a hard floor each):
 
 ```bash
-# Python backend gate (run from backend-python/)
 cd backend-python && uv run ruff check . && uv run ruff format --check . && \
-uv run pytest --cov=app --cov-report=term-missing:skip-covered --cov-branch --cov-fail-under=80
-
-# TS backend gate (run from backend-ts/) — required for any backend change
-cd backend-ts && npm run lint && npm run format:check && npm run test:cov
-
-# Frontend gate (run from frontend/) — ONLY if the frontend was touched
-cd frontend && npm run lint && npm run test -- --coverage
-
-# Parity gate (run from contracts/) — MANDATORY for any API/behavior change
-cd contracts && npm run test:parity
+  uv run pytest --cov=app --cov-report=term-missing:skip-covered --cov-branch --cov-fail-under=80
+cd ../backend-ts && npm run lint && npm run format:check && npm run test:cov      # any backend change
+cd ../frontend && npm run lint && npm run test -- --coverage && npm run build      # only if frontend touched
+cd ../contracts && npm run test:parity                                             # any API/behavior change
 ```
 
-Also confirm a **clean OpenAPI diff** (no drift between the two backends or against the canonical `contracts/` spec).
+**If any gate fails or the OpenAPI diff drifts, ABORT** — report and stop. Do not commit/push broken or out-of-parity code. (CI re-runs these on the PR, but green-locally-first is the rule.)
 
-**Mandatory rules:**
-- Both backend gates run for any API/behavior change; the frontend gate runs if `frontend/` was touched; the parity gate runs for any API/behavior change.
-- **If ANY gate fails, or the OpenAPI diff shows drift, ABORT.** Report the failure and stop — do NOT commit or merge broken code, and do NOT merge with the backends out of parity.
-- Coverage below 80% on any gate is a failure: add/update tests (synthetic fixtures only) until it passes, or abort.
+### Step 2 — README upkeep (`pull-requests.md` §1)
 
-### Step 2: Gather Context
+Update the README of **every area this branch touched** (and the top-level README if structure/usage/commands changed), per the README best practices in the rule. Update `docs/STRUCTURE.md` if layout changed.
 
-Understand what changed on this branch vs `main`:
+### Step 3 — Self-review (`pull-requests.md` §4, author checklist)
+
+Read every changed file as a reviewer would: remove debug/dead code, confirm no unrelated/whitespace churn, ensure new behavior has meaningful tests (bugfix → a test that fails without the fix), and that intent-non-obvious code is commented.
+
+### Step 4 — Gather context & write the PR doc
 
 ```bash
-git branch --show-current
-git status --short
-git diff main --stat
-git log main..HEAD --oneline
+git diff --name-only main... | wc -l      # pick the tier (≤5 small / 6–10 medium / >10 large)
+git diff main --stat ; git log main..HEAD --oneline
 ```
 
-### Step 3: Write PR Documentation
+Write `pull_requests/<slug>.md` at the tier's granularity (§2): **H1 · Summary · Changes · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Capture the **happy-path evidence** that fits the change (Playwright screenshot / OpenAPI + endpoint ping / docker-compose logs / ad-hoc DB query). No financial data — synthetic only.
 
-Create a PR doc at `pull_requests/<branch-slug>.md` (the `<slug>` portion of the branch name). Structure:
-
-```markdown
-# PR: <Title>
-
-**Branch:** `<branch-name>`           (e.g. 2026-05-24-BE/p4-2-debt-payoff-plan)
-**Base:** `main`
-**Date:** <today>
-
-## Summary
-<2-4 sentences: what changed and why, before/after impact>
-
-## Changes
-<Grouped by area — note BOTH backends and contracts/ for API changes:
- backend-python/ (FastAPI/Pydantic/Alembic), backend-ts/ (NestJS/TypeORM/class-validator),
- contracts/ (OpenAPI + parity tests), frontend/ if touched>
-
-## Test plan
-- [x] Python backend: <N> tests pass, <X>% coverage; ruff lint + format clean
-- [x] TS backend: <N> tests pass, <X>% coverage; eslint + format clean
-- [x] Frontend (if touched): <N> tests pass, <X>% coverage; lint clean
-- [x] Parity: contracts/ parity tests pass against BOTH backends; OpenAPI diff clean
-- [x] <specific new tests added>
-```
-
-Keep it under ~4000 chars. **No financial data** — no account numbers, balances, or transactions; reference synthetic fixtures only.
-
-### Step 4: Commit
-
-Stage the relevant files and commit with a descriptive message:
+### Step 5 — Commit & push the branch
 
 ```bash
-git add <specific files>
+git add <specific files>          # never git add -A; never --no-verify; never amend
 git commit -m "$(cat <<'EOF'
 <type>: <short description>
 
-<body explaining what and why; note parity across both backends + contracts/ if relevant>
+<what & why; note parity across both backends + contracts/ if relevant>
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
+git push -u origin <branch-name>
 ```
 
-Commit types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+Commit the PR doc + any README/STRUCTURE/checklist updates in the same commit. Types: `feat`/`fix`/`refactor`/`test`/`docs`/`chore`.
 
-**Rules:**
-- Stage specific files, not `git add -A`.
-- Include the PR doc and any checklist/flow/docs files in the commit.
-- **Never** skip hooks (`--no-verify`).
-- **Never** amend an existing commit — always create a new one.
-- End the commit message with the trailer exactly: `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
-
-### Step 5: Merge into Main
+### Step 6 — Open the PR & run the reviewer pass
 
 ```bash
-git checkout main
-git merge <feature-branch> --no-ff -m "Merge branch '<feature-branch>'"
+gh pr create --base main --head <branch-name> --title "<title>" --body "<mirror of the PR doc>"
 ```
 
-**Rules:**
-- Always use `--no-ff` to preserve branch history.
-- Do NOT force push.
-- Do NOT delete the feature branch automatically (leave that to the user).
+Then run the **reviewer checklist** (`pull-requests.md` §4) over the diff — optionally invoke the `code-review` or `pr-review-toolkit:review-pr` skill. Use Conventional Comments; **block only on correctness/security/major-design**, not nits. Resolve any blockers (push fixes to the branch) before merging.
 
-### Step 6: Verify
+### Step 7 — Merge on green
+
+Wait for the four checks, then merge only when all pass (branch protection enforces this):
 
 ```bash
-git log --oneline -3
-git branch --show-current   # should be main
+gh pr checks <pr-number> --watch        # run in background; merge only on exit 0 / all "pass"
+gh pr merge <pr-number> --merge --delete-branch
 ```
 
-For an API/behavior change, optionally re-run the parity gate against merged `main` to confirm the backends still match:
+If a check is **red**: read the failing job logs, fix on the branch, push, and re-watch — do **not** override or merge red.
+
+### Step 8 — Verify & notify
 
 ```bash
-cd contracts && npm run test:parity
+git checkout main && git pull origin main && git log --oneline -3   # merge commit present
+cd contracts && npm run test:parity                                 # optional: parity intact on merged main
 ```
 
-### Step 7: Notify
-
-Report what was done:
-- Branch name and commit hash.
-- Number of files changed.
-- Gate results summary (python, ts-backend, frontend if touched, parity + OpenAPI diff).
-- Merge commit hash.
-
-Then, if the user opts in to the notification sound:
+Report: branch name, PR number/URL, files changed + tier, gate results (python / ts-backend / frontend / parity with %), the happy-path evidence captured, and the merge commit. If the user opts into the sound:
 
 ```bash
 afplay ~/Downloads/555269__diarchangeli__choir-notification-ringtone-tone-e-major.aiff
@@ -163,11 +107,8 @@ afplay ~/Downloads/555269__diarchangeli__choir-notification-ringtone-tone-e-majo
 
 ## Important Notes
 
-- **Local-only.** Never push to a remote unless the user explicitly asks.
-- **Backend parity is mandatory.** Do not finalize an API/behavior change unless both backend gates AND the parity gate pass and the OpenAPI diff is clean. The canonical Alembic schema and `contracts/` OpenAPI spec are authoritative; the TypeORM schema must mirror Alembic.
-- **Never amend** existing commits. Always create new ones.
-- **Never `--no-verify`.**
-- **If any preflight gate fails or parity drifts**, stop and report the failure. Do not proceed to merge.
-- **If there are merge conflicts**, stop and ask the user how to resolve them.
-- **If already on `main`**, ask the user which branch to finalize.
-- **Data privacy:** real financial data is gitignored; never put account numbers, balances, or transactions into code, tests, PR docs, commits, or queries. Use synthetic fixtures only.
+- **Backend parity is mandatory** — never finalize an API/behavior change unless both backend gates AND the parity gate pass and the OpenAPI diff is clean. Alembic is canonical; TypeORM mirrors it.
+- **Merge via PR, on green only.** Never local-merge to `main` (protection rejects it); never `--no-verify`; never amend; never override a red check.
+- **READMEs + `docs/STRUCTURE.md` are part of the PR** when the branch changed layout/usage (`pull-requests.md` §1, `structure-on-merge.md`).
+- **Stop and ask** on merge conflicts, or if you're on `main` with no branch named.
+- **Data privacy:** real financial data is gitignored; synthetic fixtures only in code/tests/PR docs/screenshots/queries.
