@@ -7,6 +7,7 @@
 > - 2026-05-24: Scaffolded `backend-python/app/` (FastAPI app, settings, DB wiring, `/health`) + Alembic (`backend-python/alembic/`). — P1.2.
 > - 2026-05-24: Scaffolded `backend-ts/` (NestJS parity twin: `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger` OpenAPI at `/openapi.json`, TypeORM `synchronize: false`, `GET /health` → `{"status":"ok"}`). — P1.3.
 > - 2026-05-24: Built the cross-backend **parity harness** in `contracts/` (Vitest): `npm run test:parity` boots BOTH backends (FastAPI :8765, NestJS :3765 — never :8000), polls `/health` for the real `{"status":"ok"}` body, asserts response parity + structural OpenAPI parity for `/health` against a canonical contract, then tears both down. — P1.4.
+> - 2026-05-24: Scaffolded the **frontend** (`frontend/`): Vite 8 + React 19 + TypeScript (strict) with Tailwind v4 via the `@tailwindcss/vite` plugin (`@import "tailwindcss"` in `src/index.css`). Backend-NEUTRAL: single network boundary `src/lib/api.ts` reads `VITE_API_BASE_URL` (default `http://localhost:8000`) and `getHealth()` GETs `/health`; `src/features/health/HealthStatus.tsx` renders explicit loading/success/error states and shows the active base URL. Vitest (jsdom + RTL, ≥80% coverage, entry/config excluded); scripts `dev`/`build`/`lint`/`test`. — P1.5.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -19,7 +20,16 @@ personal_finance/
 ├── .env.example               # Env template (copy to .env; gitignored)
 ├── pyproject.toml             # ROOT uv project: data-prep utilities (scripts/ + tests/)
 │
-├── frontend/                  # React + Vite + Tailwind (TS) — backend-neutral via VITE_API_BASE_URL
+├── frontend/                  # React 19 + Vite 8 + Tailwind v4 (TS, strict) — backend-neutral via VITE_API_BASE_URL
+│   ├── src/                   #   main.tsx (entry) · App.tsx (page shell) · index.css (@import "tailwindcss")
+│   │   ├── lib/               #     api.ts — single network boundary: apiBaseUrl + getHealth() (reads VITE_API_BASE_URL)
+│   │   ├── features/          #     health/HealthStatus.tsx — loading/success/error UI; shows active API base URL
+│   │   └── test/              #     setup.ts (jest-dom + RTL cleanup); *.test.tsx mock only the api boundary
+│   ├── index.html             #   Vite HTML entry (#root)
+│   ├── vite.config.ts         #   @vitejs/plugin-react + @tailwindcss/vite + Vitest (jsdom, v8 cov ≥80%, excl main.tsx/configs)
+│   ├── eslint.config.js       #   flat config: typescript-eslint + react-hooks + react-refresh
+│   ├── tsconfig*.json          #   project refs: app (DOM) + node; package.json scripts: dev/build/lint/test
+│   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
 ├── backend-python/            # FastAPI + Pydantic v2 (uv project, package `app`); SQLAlchemy + Alembic
 │   ├── app/                   #   __init__ · config.py (pydantic-settings) · db.py (SQLAlchemy 2.0 engine/
 │   │                          #     Session/Base/get_db, psycopg3) · schemas.py (HealthResponse) ·
@@ -77,4 +87,4 @@ See `.claude/rules/data-privacy.md`.
 
 ## Status
 
-Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2), the **NestJS backend scaffold** (`backend-ts/`) exposing the same `GET /health` → `{"status":"ok"}` plus OpenAPI at `/openapi.json` (P1.3), and the **cross-backend parity harness** (`contracts/`, P1.4) whose `npm run test:parity` boots both backends, asserts response + structural-OpenAPI parity for `/health` against a canonical contract, and tears them down. The `frontend/` tree is a scaffolding placeholder pending the remaining P1+ phases in `plans/agent_checklist.md`.
+Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2), the **NestJS backend scaffold** (`backend-ts/`) exposing the same `GET /health` → `{"status":"ok"}` plus OpenAPI at `/openapi.json` (P1.3), and the **cross-backend parity harness** (`contracts/`, P1.4) whose `npm run test:parity` boots both backends, asserts response + structural-OpenAPI parity for `/health` against a canonical contract, and tears them down. The **frontend** (`frontend/`, P1.5) is scaffolded (Vite + React + Tailwind v4, TS): a backend-neutral app that renders the configured backend's `/health` via `VITE_API_BASE_URL` and works against either backend. Remaining feature phases are tracked in `plans/agent_checklist.md`.
