@@ -12,6 +12,8 @@
 
 > - 2026-05-24: Added the **PR rule** (`.claude/rules/pull-requests.md`: README upkeep + file-count-tiered PR descriptions + happy-path verification) and a **README in every first-level dir** — top-level `README.md` plus `frontend/`, `backend-python/`, `scripts/`, `tests/`, `config/`, `docs/`, `plans/` (`backend-ts/` and `contracts/` already had theirs). — PR-rule + READMEs.
 
+> - 2026-05-24: Enforced "every PR via `branch-finalization`": added a `PreToolUse(Bash)` hook (`.claude/hooks/pr-create-reminder.sh` + committed `.claude/settings.json`) that reminds on `gh pr create`; the PR rule + both checklist runner skills now mandate the CI-gated PR flow (no local merge to protected `main`). — Enforce PR flow.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
