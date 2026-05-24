@@ -41,7 +41,7 @@
   - *Verify:* `npm run start:dev` serves `GET /health` → 200 identical shape; `npm run lint && npm run test:cov` (≥80%) passes.
 
 ### P1.4 — Parity harness
-- [ ] `contracts/` project: canonical OpenAPI doc + parity test runner that hits both backends; `npm run test:parity`.
+- [x] `contracts/` project: canonical OpenAPI doc + parity test runner that hits both backends; `npm run test:parity`.
   - *Verify:* `/health` parity test passes against both; OpenAPI diff clean.
 
 ### P1.5 — frontend scaffold

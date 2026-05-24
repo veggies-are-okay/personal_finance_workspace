@@ -1,0 +1,6 @@
+# contracts/ — Node parity harness. Root .gitignore already covers these;
+# repeated here as defense-in-depth so this project is self-contained.
+node_modules/
+coverage/
+*.tsbuildinfo
+.vitest/

@@ -1,0 +1,31 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "personal-finance-api",
+    "description": "Canonical cross-backend contract. Both backend-python (FastAPI) and backend-ts (NestJS) MUST conform to this shape structurally (see .claude/rules/backend-parity.md). This file is the agreed source of truth that the parity harness checks BOTH backends against; it grows one operation at a time as endpoints are added.",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness probe. DB-independent; always 200 {\"status\":\"ok\"}.",
+        "responses": {
+          "200": {
+            "description": "Service is alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
