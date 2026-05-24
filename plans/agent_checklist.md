@@ -37,7 +37,7 @@
   - *Verify:* `uv run uvicorn app.main:app` serves `GET /health` → 200; quality gate (ruff+format+pytest ≥80%) passes.
 
 ### P1.3 — backend-ts scaffold (NestJS)
-- [ ] Nest app, `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger`, `GET /health` matching FastAPI.
+- [x] Nest app, `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger`, `GET /health` matching FastAPI.
   - *Verify:* `npm run start:dev` serves `GET /health` → 200 identical shape; `npm run lint && npm run test:cov` (≥80%) passes.
 
 ### P1.4 — Parity harness

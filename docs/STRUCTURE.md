@@ -5,6 +5,7 @@
 > - 2026-05-24: Added `scripts/ledger.py` (multi-source normalizers + combined loader) and `tests/fixtures/` (synthetic CSV fixtures). — P0.3.
 > - 2026-05-24: Added `docs/setup.md` (local Postgres bring-up via docker-compose). — P1.1.
 > - 2026-05-24: Scaffolded `backend-python/app/` (FastAPI app, settings, DB wiring, `/health`) + Alembic (`backend-python/alembic/`). — P1.2.
+> - 2026-05-24: Scaffolded `backend-ts/` (NestJS parity twin: `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger` OpenAPI at `/openapi.json`, TypeORM `synchronize: false`, `GET /health` → `{"status":"ok"}`). — P1.3.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -26,6 +27,15 @@ personal_finance/
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
 │   └── tests/                 #   conftest (TestClient) + test_health/test_config/test_db (≥80% cov on app)
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python
+│   ├── src/                   #   main.ts (bootstrap: global ValidationPipe, Swagger → /openapi.json,
+│   │                          #     listens on TS_API_PORT) · app.module.ts (ConfigModule reads repo-root
+│   │                          #     .env, TypeOrmModule.forRootAsync postgres synchronize:false retryAttempts:0,
+│   │                          #     buildTypeOrmOptions) · health/ (module · controller · service ·
+│   │                          #     health-response.dto.ts + *.spec.ts unit tests)
+│   ├── test/                  #   health.e2e-spec.ts (Supertest; DataSource overridden → boots without a DB)
+│   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
+│   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
+│   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
 ├── contracts/                 # Canonical OpenAPI spec + cross-backend parity tests
 │
 ├── scripts/                   # Statement ingestion utilities: extract_chase_statements.py (PDF→CSV),
@@ -56,4 +66,4 @@ See `.claude/rules/data-privacy.md`.
 
 ## Status
 
-Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), and the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2). The `frontend/`, `backend-ts/src/`, and `contracts/` trees are scaffolding placeholders pending the remaining P1+ phases in `plans/agent_checklist.md`.
+Foundation stage. Built so far: skeleton, both backend project configs, rule + skill libraries, the Chase PDF extractor (`scripts/extract_chase_statements.py`), the **FastAPI backend scaffold** (`backend-python/app/` + Alembic) exposing `GET /health` (P1.2), and the **NestJS backend scaffold** (`backend-ts/`) exposing the same `GET /health` → `{"status":"ok"}` plus OpenAPI at `/openapi.json` (P1.3). The `frontend/` and `contracts/` trees are scaffolding placeholders pending the remaining P1+ phases in `plans/agent_checklist.md`.
