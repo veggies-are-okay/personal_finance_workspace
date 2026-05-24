@@ -2,13 +2,22 @@
   "openapi": "3.1.0",
   "info": {
     "title": "personal-finance-api",
-    "description": "Canonical cross-backend contract. Both backend-python (FastAPI) and backend-ts (NestJS) MUST conform to this shape structurally (see .claude/rules/backend-parity.md). This file is the agreed source of truth that the parity harness checks BOTH backends against; it grows one operation at a time as endpoints are added.",
-    "version": "0.0.0"
+    "description": "Canonical cross-backend contract. Both backend-python (FastAPI) and backend-ts (NestJS) MUST conform to this shape structurally (see .claude/rules/backend-parity.md). This file is the agreed source of truth that the parity harness checks BOTH backends against. It is authored COMPLETE and FROZEN in P2.2 (DA-25): every path the program will ever serve is declared here up front so Stage-4 endpoint branches implement against it and NEVER edit this file. Conventions (Appendix A): money = decimal STRING (NUMERIC(14,2) wire form, e.g. \"123.45\"); percentages/ratios = JSON NUMBER 0-100; datetimes = ISO-8601 UTC with trailing Z; dates = YYYY-MM-DD; lists paginate via the Paginated envelope {data,pagination{limit,offset,total}}; request-validation failures return HTTP 422 with the canonical Error envelope; responses OMIT absent optional fields (never emit null for an absent value). All example values are SYNTHETIC.",
+    "version": "1.0.0"
   },
+  "servers": [{ "url": "http://localhost:8000", "description": "Backend root (FastAPI :8000 / NestJS :3000); view + source + connections live under /api/v1." }],
+  "tags": [
+    { "name": "health", "description": "Liveness." },
+    { "name": "view", "description": "Read-only screen data, served from precomputed/normalized tables." },
+    { "name": "sources", "description": "Per-source ingestion/adapter layer (local CSV or live API)." },
+    { "name": "connections", "description": "Plaid Link lifecycle + Item management." }
+  ],
   "paths": {
     "/health": {
       "get": {
+        "tags": ["health"],
         "summary": "Liveness probe. DB-independent; always 200 {\"status\":\"ok\"}.",
+        "operationId": "getHealth",
         "responses": {
           "200": {
             "description": "Service is alive.",
@@ -17,14 +26,905 @@
                 "schema": {
                   "type": "object",
                   "required": ["status"],
-                  "properties": {
-                    "status": { "type": "string" }
+                  "properties": { "status": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/v1/transactions": {
+      "get": {
+        "tags": ["view"],
+        "summary": "List/search/filter transactions (paginated).",
+        "operationId": "listTransactions",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "name": "date_from", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/Date" }, "description": "Inclusive lower bound (YYYY-MM-DD)." },
+          { "name": "date_to", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/Date" }, "description": "Inclusive upper bound (YYYY-MM-DD)." },
+          { "name": "account", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Account name filter." },
+          { "name": "category", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Category name filter." },
+          { "name": "q", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Free-text description search." }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of transactions.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedTransactions" }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/budget": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Budget view: savings rate, tax rate, 50/30/20 buckets, categories, monthly needs/wants, recurring charges. Served from precomputed tables.",
+        "operationId": "getBudget",
+        "parameters": [{ "$ref": "#/components/parameters/Window" }],
+        "responses": {
+          "200": {
+            "description": "Budget summary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Budget" } } }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/networth": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Net-worth view: totals, monthly series, per-account balances and 30-day deltas.",
+        "operationId": "getNetworth",
+        "parameters": [{ "$ref": "#/components/parameters/Window" }],
+        "responses": {
+          "200": {
+            "description": "Net-worth summary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NetWorth" } } }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/investments": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Investments view: portfolio value, unrealized gain, allocation, concentration, holdings.",
+        "operationId": "getInvestments",
+        "responses": {
+          "200": {
+            "description": "Investments summary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Investments" } } }
+          },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/debt": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Debt view: totals, weighted average rate, tranches, payoff projections, loans.",
+        "operationId": "getDebt",
+        "parameters": [
+          { "name": "strategy", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/PayoffStrategy" }, "description": "Payoff strategy to project (avalanche | minimums)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debt summary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Debt" } } }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/goals": {
+      "get": {
+        "tags": ["view"],
+        "summary": "Goals view: target, saved, progress, funding sources, affordability.",
+        "operationId": "getGoals",
+        "responses": {
+          "200": {
+            "description": "Goals summary.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Goals" } } }
+          },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/sources/transactions": {
+      "get": {
+        "tags": ["sources"],
+        "summary": "Raw transaction source rows (local CSV or Plaid). 200 + empty data + source_status=not_connected when in API mode with no Item.",
+        "operationId": "getSourceTransactions",
+        "responses": {
+          "200": { "description": "Source rows.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceTransactions" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/sources/income": {
+      "get": {
+        "tags": ["sources"],
+        "summary": "Income source rows (local CSV or Plaid Income).",
+        "operationId": "getSourceIncome",
+        "responses": {
+          "200": { "description": "Source rows.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceIncome" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/sources/holdings": {
+      "get": {
+        "tags": ["sources"],
+        "summary": "Holdings source rows (local CSV or Plaid Investments / E*TRADE).",
+        "operationId": "getSourceHoldings",
+        "responses": {
+          "200": { "description": "Source rows.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceHoldings" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/sources/loans": {
+      "get": {
+        "tags": ["sources"],
+        "summary": "Loan source rows (local CSV or Plaid Liabilities).",
+        "operationId": "getSourceLoans",
+        "responses": {
+          "200": { "description": "Source rows.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceLoans" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/sources/listings": {
+      "get": {
+        "tags": ["sources"],
+        "summary": "Real-estate listings/comps source rows (RentCast).",
+        "operationId": "getSourceListings",
+        "responses": {
+          "200": { "description": "Source rows.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceListings" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+
+    "/api/v1/connections/link-token": {
+      "post": {
+        "tags": ["connections"],
+        "summary": "Create a Plaid Link token for the browser widget.",
+        "operationId": "createLinkToken",
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LinkTokenCreateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Short-lived link token.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LinkTokenResponse" } } } },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/connections/exchange": {
+      "post": {
+        "tags": ["connections"],
+        "summary": "Exchange a Plaid public_token for an Item; access_token is encrypted server-side and never returned.",
+        "operationId": "exchangePublicToken",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExchangeRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Item created/updated.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExchangeResponse" } } } },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/connections": {
+      "get": {
+        "tags": ["connections"],
+        "summary": "List linked Items and per-source mode/status (drives the Settings screen).",
+        "operationId": "listConnections",
+        "responses": {
+          "200": { "description": "Connections snapshot.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectionsList" } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/connections/webhook": {
+      "post": {
+        "tags": ["connections"],
+        "summary": "Plaid webhook receiver. JWT-verified against Plaid JWKS; unverified -> 401. Always returns the canonical Acknowledgement body on accept.",
+        "operationId": "receiveWebhook",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Accepted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Acknowledgement" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "parameters": {
+      "Limit": {
+        "name": "limit", "in": "query", "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 },
+        "description": "Page size (1-200; default 50)."
+      },
+      "Offset": {
+        "name": "offset", "in": "query", "required": false,
+        "schema": { "type": "integer", "minimum": 0, "default": 0 },
+        "description": "Zero-based row offset (default 0)."
+      },
+      "Window": {
+        "name": "window", "in": "query", "required": false,
+        "schema": { "type": "string", "examples": ["12m"] },
+        "description": "Rolling window selector, e.g. \"3m\", \"12m\", \"ytd\"."
+      }
+    },
+
+    "responses": {
+      "ValidationError": {
+        "description": "Request validation failed (canonical error envelope).",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "invalidLimit": {
+                "value": {
+                  "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "Request validation failed.",
+                    "details": [
+                      { "field": "limit", "location": "query", "message": "must be <= 200", "code": "max" }
+                    ]
                   }
                 }
               }
             }
           }
         }
+      },
+      "Unauthorized": {
+        "description": "Authentication/verification failed (canonical error envelope).",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "badWebhookJwt": {
+                "value": { "error": { "code": "UNAUTHORIZED", "message": "Webhook signature verification failed.", "details": [] } }
+              }
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Backing store unavailable / not ready (canonical error envelope).",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "examples": {
+              "dbDown": { "value": { "error": { "code": "SERVICE_UNAVAILABLE", "message": "Database unavailable.", "details": [] } } }
+            }
+          }
+        }
+      }
+    },
+
+    "schemas": {
+      "Money": {
+        "type": "string",
+        "pattern": "^-?\\d+\\.\\d{2}$",
+        "description": "Monetary amount as a fixed 2dp decimal STRING (never a JSON number). Negative = money out. DB NUMERIC(14,2).",
+        "examples": ["123.45", "-45.00"]
+      },
+      "Percentage": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Percentage/ratio as a JSON NUMBER on a 0-100 scale (one decimal place by convention, e.g. 26.0). Never a string, never 0-1.",
+        "examples": [26.0]
+      },
+      "Date": {
+        "type": "string",
+        "format": "date",
+        "description": "Calendar date, YYYY-MM-DD.",
+        "examples": ["2026-05-24"]
+      },
+      "DateTime": {
+        "type": "string",
+        "format": "date-time",
+        "description": "ISO-8601 instant in UTC with a trailing Z. Naive datetimes are rejected on input.",
+        "examples": ["2026-05-24T10:00:00Z"]
+      },
+      "Month": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}$",
+        "description": "Year-month, YYYY-MM.",
+        "examples": ["2026-05"]
+      },
+
+      "Bucket": {
+        "type": "string",
+        "enum": ["needs", "wants", "savings"],
+        "description": "50/30/20 bucket."
+      },
+      "Source": {
+        "type": "string",
+        "enum": ["transactions", "income", "holdings", "loans", "listings"],
+        "description": "Data source family."
+      },
+      "SourceMode": {
+        "type": "string",
+        "enum": ["local", "api"],
+        "description": "Where a source's data comes from: local flat file or live API."
+      },
+      "ItemStatus": {
+        "type": "string",
+        "enum": ["connected", "needs_reauth", "error", "disconnected", "not_connected"],
+        "description": "Lifecycle state of a linked Item / source connection."
+      },
+      "SourceStatus": {
+        "$ref": "#/components/schemas/ItemStatus"
+      },
+      "LoanPriority": {
+        "type": "string",
+        "enum": ["pay_first", "then", "minimums"],
+        "description": "Payoff priority of a loan tranche."
+      },
+      "PayoffStrategy": {
+        "type": "string",
+        "enum": ["avalanche", "minimums"],
+        "description": "Debt payoff strategy."
+      },
+
+      "ErrorDetail": {
+        "type": "object",
+        "required": ["field", "location", "message", "code"],
+        "properties": {
+          "field": { "type": "string", "examples": ["limit"] },
+          "location": { "type": "string", "examples": ["query"] },
+          "message": { "type": "string", "examples": ["must be <= 200"] },
+          "code": { "type": "string", "examples": ["max"] }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "details"],
+            "properties": {
+              "code": { "type": "string", "description": "Stable machine code: VALIDATION_ERROR | NOT_FOUND | CONFLICT | UNAUTHORIZED | SERVICE_UNAVAILABLE.", "examples": ["VALIDATION_ERROR"] },
+              "message": { "type": "string", "examples": ["Request validation failed."] },
+              "details": { "type": "array", "items": { "$ref": "#/components/schemas/ErrorDetail" } }
+            }
+          }
+        },
+        "description": "The ONE canonical error envelope for both backends. Request-validation failures use HTTP 422 with code VALIDATION_ERROR."
+      },
+
+      "Pagination": {
+        "type": "object",
+        "required": ["limit", "offset", "total"],
+        "properties": {
+          "limit": { "type": "integer", "examples": [50] },
+          "offset": { "type": "integer", "examples": [0] },
+          "total": { "type": "integer", "description": "Total matching rows ignoring pagination.", "examples": [128] }
+        }
+      },
+
+      "Transaction": {
+        "type": "object",
+        "required": ["date", "account", "description", "amount", "is_recurring"],
+        "properties": {
+          "date": { "$ref": "#/components/schemas/Date" },
+          "account": { "type": "string", "examples": ["Checking"] },
+          "description": { "type": "string", "examples": ["Coffee Shop"] },
+          "category": { "type": "string", "description": "Optional; omitted when uncategorized.", "examples": ["dining"] },
+          "bucket": { "$ref": "#/components/schemas/Bucket" },
+          "amount": { "$ref": "#/components/schemas/Money" },
+          "is_recurring": { "type": "boolean", "examples": [false] }
+        }
+      },
+      "PaginatedTransactions": {
+        "type": "object",
+        "required": ["data", "pagination"],
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Transaction" } },
+          "pagination": { "$ref": "#/components/schemas/Pagination" }
+        },
+        "examples": [
+          {
+            "data": [
+              { "date": "2026-05-20", "account": "Checking", "description": "Coffee Shop", "category": "dining", "bucket": "wants", "amount": "-4.75", "is_recurring": false }
+            ],
+            "pagination": { "limit": 50, "offset": 0, "total": 1 }
+          }
+        ]
+      },
+
+      "BudgetBucket": {
+        "type": "object",
+        "required": ["name", "target_pct", "actual_pct", "amount"],
+        "properties": {
+          "name": { "$ref": "#/components/schemas/Bucket" },
+          "target_pct": { "$ref": "#/components/schemas/Percentage" },
+          "actual_pct": { "$ref": "#/components/schemas/Percentage" },
+          "amount": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "BudgetCategory": {
+        "type": "object",
+        "required": ["name", "amount", "bucket"],
+        "properties": {
+          "name": { "type": "string", "examples": ["groceries"] },
+          "amount": { "$ref": "#/components/schemas/Money" },
+          "bucket": { "$ref": "#/components/schemas/Bucket" }
+        }
+      },
+      "MonthlyNeedsWants": {
+        "type": "object",
+        "required": ["month", "needs", "wants"],
+        "properties": {
+          "month": { "$ref": "#/components/schemas/Month" },
+          "needs": { "$ref": "#/components/schemas/Money" },
+          "wants": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "RecurringCharge": {
+        "type": "object",
+        "required": ["merchant", "category", "cadence", "last_charged", "monthly_est"],
+        "properties": {
+          "merchant": { "type": "string", "examples": ["Streaming Co"] },
+          "category": { "type": "string", "examples": ["entertainment"] },
+          "cadence": { "type": "string", "examples": ["monthly"] },
+          "last_charged": { "$ref": "#/components/schemas/Date" },
+          "monthly_est": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Budget": {
+        "type": "object",
+        "required": ["savings_rate", "effective_tax_rate", "buckets", "categories", "monthly", "recurring"],
+        "properties": {
+          "savings_rate": { "$ref": "#/components/schemas/Percentage" },
+          "effective_tax_rate": { "$ref": "#/components/schemas/Percentage" },
+          "buckets": { "type": "array", "items": { "$ref": "#/components/schemas/BudgetBucket" } },
+          "categories": { "type": "array", "items": { "$ref": "#/components/schemas/BudgetCategory" } },
+          "monthly": { "type": "array", "items": { "$ref": "#/components/schemas/MonthlyNeedsWants" } },
+          "recurring": { "type": "array", "items": { "$ref": "#/components/schemas/RecurringCharge" } }
+        },
+        "examples": [
+          {
+            "savings_rate": 22.0,
+            "effective_tax_rate": 18.5,
+            "buckets": [
+              { "name": "needs", "target_pct": 50.0, "actual_pct": 48.0, "amount": "2400.00" },
+              { "name": "wants", "target_pct": 30.0, "actual_pct": 30.0, "amount": "1500.00" },
+              { "name": "savings", "target_pct": 20.0, "actual_pct": 22.0, "amount": "1100.00" }
+            ],
+            "categories": [{ "name": "groceries", "amount": "420.00", "bucket": "needs" }],
+            "monthly": [{ "month": "2026-05", "needs": "2400.00", "wants": "1500.00" }],
+            "recurring": [{ "merchant": "Streaming Co", "category": "entertainment", "cadence": "monthly", "last_charged": "2026-05-01", "monthly_est": "15.99" }]
+          }
+        ]
+      },
+
+      "NetWorthSeriesPoint": {
+        "type": "object",
+        "required": ["month", "retirement", "investments", "cash"],
+        "properties": {
+          "month": { "$ref": "#/components/schemas/Month" },
+          "retirement": { "$ref": "#/components/schemas/Money" },
+          "investments": { "$ref": "#/components/schemas/Money" },
+          "cash": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "NetWorthAccount": {
+        "type": "object",
+        "required": ["name", "type", "balance", "delta_30d"],
+        "properties": {
+          "name": { "type": "string", "examples": ["Brokerage"] },
+          "type": { "type": "string", "examples": ["investment"] },
+          "balance": { "$ref": "#/components/schemas/Money" },
+          "delta_30d": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "NetWorth": {
+        "type": "object",
+        "required": ["net_worth", "assets", "liabilities", "series", "accounts"],
+        "properties": {
+          "net_worth": { "$ref": "#/components/schemas/Money" },
+          "assets": { "$ref": "#/components/schemas/Money" },
+          "liabilities": { "$ref": "#/components/schemas/Money" },
+          "series": { "type": "array", "items": { "$ref": "#/components/schemas/NetWorthSeriesPoint" } },
+          "accounts": { "type": "array", "items": { "$ref": "#/components/schemas/NetWorthAccount" } }
+        },
+        "examples": [
+          {
+            "net_worth": "152340.00",
+            "assets": "178900.00",
+            "liabilities": "26560.00",
+            "series": [{ "month": "2026-05", "retirement": "90000.00", "investments": "60000.00", "cash": "28900.00" }],
+            "accounts": [{ "name": "Brokerage", "type": "investment", "balance": "60000.00", "delta_30d": "1250.00" }]
+          }
+        ]
+      },
+
+      "Allocation": {
+        "type": "object",
+        "required": ["class", "target_pct", "actual_pct", "amount"],
+        "properties": {
+          "class": { "type": "string", "examples": ["equities"] },
+          "target_pct": { "$ref": "#/components/schemas/Percentage" },
+          "actual_pct": { "$ref": "#/components/schemas/Percentage" },
+          "amount": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Concentration": {
+        "type": "object",
+        "required": ["holding", "weight"],
+        "properties": {
+          "holding": { "type": "string", "examples": ["VTI"] },
+          "weight": { "$ref": "#/components/schemas/Percentage" }
+        }
+      },
+      "Holding": {
+        "type": "object",
+        "required": ["symbol", "name", "value", "weight", "gain"],
+        "properties": {
+          "symbol": { "type": "string", "examples": ["VTI"] },
+          "name": { "type": "string", "examples": ["Total Market ETF"] },
+          "value": { "$ref": "#/components/schemas/Money" },
+          "weight": { "$ref": "#/components/schemas/Percentage" },
+          "gain": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Investments": {
+        "type": "object",
+        "required": ["portfolio_value", "unrealized_gain", "allocation", "concentration", "holdings"],
+        "properties": {
+          "portfolio_value": { "$ref": "#/components/schemas/Money" },
+          "unrealized_gain": { "$ref": "#/components/schemas/Money" },
+          "allocation": { "type": "array", "items": { "$ref": "#/components/schemas/Allocation" } },
+          "concentration": { "type": "array", "items": { "$ref": "#/components/schemas/Concentration" } },
+          "holdings": { "type": "array", "items": { "$ref": "#/components/schemas/Holding" } }
+        },
+        "examples": [
+          {
+            "portfolio_value": "60000.00",
+            "unrealized_gain": "8200.00",
+            "allocation": [{ "class": "equities", "target_pct": 80.0, "actual_pct": 82.0, "amount": "49200.00" }],
+            "concentration": [{ "holding": "VTI", "weight": 45.0 }],
+            "holdings": [{ "symbol": "VTI", "name": "Total Market ETF", "value": "27000.00", "weight": 45.0, "gain": "3600.00" }]
+          }
+        ]
+      },
+
+      "DebtTranche": {
+        "type": "object",
+        "required": ["rate", "balance", "loan_count", "priority"],
+        "properties": {
+          "rate": { "$ref": "#/components/schemas/Percentage" },
+          "balance": { "$ref": "#/components/schemas/Money" },
+          "loan_count": { "type": "integer", "examples": [3] },
+          "priority": { "$ref": "#/components/schemas/LoanPriority" }
+        }
+      },
+      "PayoffProjection": {
+        "type": "object",
+        "required": ["strategy", "debt_free_year", "total_interest"],
+        "properties": {
+          "strategy": { "$ref": "#/components/schemas/PayoffStrategy" },
+          "debt_free_year": { "type": "integer", "examples": [2031] },
+          "total_interest": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Loan": {
+        "type": "object",
+        "required": ["name", "balance", "rate", "minimum_payment", "priority"],
+        "properties": {
+          "name": { "type": "string", "examples": ["Student Loan A"] },
+          "balance": { "$ref": "#/components/schemas/Money" },
+          "rate": { "$ref": "#/components/schemas/Percentage" },
+          "minimum_payment": { "$ref": "#/components/schemas/Money" },
+          "priority": { "$ref": "#/components/schemas/LoanPriority" }
+        }
+      },
+      "Debt": {
+        "type": "object",
+        "required": ["total", "weighted_avg_rate", "monthly_minimum", "tranches", "payoff", "loans"],
+        "properties": {
+          "total": { "$ref": "#/components/schemas/Money" },
+          "weighted_avg_rate": { "$ref": "#/components/schemas/Percentage" },
+          "monthly_minimum": { "$ref": "#/components/schemas/Money" },
+          "tranches": { "type": "array", "items": { "$ref": "#/components/schemas/DebtTranche" } },
+          "payoff": { "type": "array", "items": { "$ref": "#/components/schemas/PayoffProjection" } },
+          "loans": { "type": "array", "items": { "$ref": "#/components/schemas/Loan" } }
+        },
+        "examples": [
+          {
+            "total": "26560.00",
+            "weighted_avg_rate": 5.4,
+            "monthly_minimum": "320.00",
+            "tranches": [{ "rate": 6.8, "balance": "12000.00", "loan_count": 2, "priority": "pay_first" }],
+            "payoff": [{ "strategy": "avalanche", "debt_free_year": 2031, "total_interest": "4120.00" }],
+            "loans": [{ "name": "Student Loan A", "balance": "12000.00", "rate": 6.8, "minimum_payment": "150.00", "priority": "pay_first" }]
+          }
+        ]
+      },
+
+      "GoalFunding": {
+        "type": "object",
+        "required": ["source", "amount"],
+        "properties": {
+          "source": { "type": "string", "examples": ["savings"] },
+          "amount": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "Affordability": {
+        "type": "object",
+        "required": ["price", "down_payment", "mortgage", "monthly_piti", "income_share"],
+        "properties": {
+          "price": { "$ref": "#/components/schemas/Money" },
+          "down_payment": { "$ref": "#/components/schemas/Money" },
+          "mortgage": { "$ref": "#/components/schemas/Money" },
+          "monthly_piti": { "$ref": "#/components/schemas/Money" },
+          "income_share": { "$ref": "#/components/schemas/Percentage" }
+        }
+      },
+      "Goals": {
+        "type": "object",
+        "required": ["target", "saved", "progress_pct", "funding", "affordability"],
+        "properties": {
+          "target": { "$ref": "#/components/schemas/Money" },
+          "saved": { "$ref": "#/components/schemas/Money" },
+          "progress_pct": { "$ref": "#/components/schemas/Percentage" },
+          "funding": { "type": "array", "items": { "$ref": "#/components/schemas/GoalFunding" } },
+          "affordability": { "$ref": "#/components/schemas/Affordability" }
+        },
+        "examples": [
+          {
+            "target": "60000.00",
+            "saved": "21000.00",
+            "progress_pct": 35.0,
+            "funding": [{ "source": "savings", "amount": "15000.00" }],
+            "affordability": { "price": "420000.00", "down_payment": "84000.00", "mortgage": "336000.00", "monthly_piti": "2450.00", "income_share": 28.0 }
+          }
+        ]
+      },
+
+      "SourceTransactionRow": {
+        "type": "object",
+        "required": ["date", "account", "description", "amount"],
+        "properties": {
+          "date": { "$ref": "#/components/schemas/Date" },
+          "account": { "type": "string", "examples": ["Checking"] },
+          "description": { "type": "string", "examples": ["Coffee Shop"] },
+          "amount": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "SourceTransactions": {
+        "type": "object",
+        "required": ["source", "mode", "source_status", "data"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "source_status": { "$ref": "#/components/schemas/SourceStatus" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/SourceTransactionRow" } }
+        },
+        "examples": [
+          { "source": "transactions", "mode": "local", "source_status": "connected", "data": [{ "date": "2026-05-20", "account": "Checking", "description": "Coffee Shop", "amount": "-4.75" }] },
+          { "source": "transactions", "mode": "api", "source_status": "not_connected", "data": [] }
+        ]
+      },
+      "SourceIncomeRow": {
+        "type": "object",
+        "required": ["pay_date", "employer", "gross", "net"],
+        "properties": {
+          "pay_date": { "$ref": "#/components/schemas/Date" },
+          "employer": { "type": "string", "examples": ["Acme Corp"] },
+          "gross": { "$ref": "#/components/schemas/Money" },
+          "net": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "SourceIncome": {
+        "type": "object",
+        "required": ["source", "mode", "source_status", "data"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "source_status": { "$ref": "#/components/schemas/SourceStatus" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/SourceIncomeRow" } }
+        },
+        "examples": [
+          { "source": "income", "mode": "local", "source_status": "connected", "data": [{ "pay_date": "2026-05-15", "employer": "Acme Corp", "gross": "4200.00", "net": "3100.00" }] }
+        ]
+      },
+      "SourceHoldingRow": {
+        "type": "object",
+        "required": ["symbol", "quantity", "value"],
+        "properties": {
+          "symbol": { "type": "string", "examples": ["VTI"] },
+          "quantity": { "type": "string", "description": "Share quantity as a decimal string (fractional shares allowed).", "examples": ["12.5"] },
+          "value": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "SourceHoldings": {
+        "type": "object",
+        "required": ["source", "mode", "source_status", "data"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "source_status": { "$ref": "#/components/schemas/SourceStatus" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/SourceHoldingRow" } }
+        },
+        "examples": [
+          { "source": "holdings", "mode": "local", "source_status": "connected", "data": [{ "symbol": "VTI", "quantity": "12.5", "value": "27000.00" }] }
+        ]
+      },
+      "SourceLoanRow": {
+        "type": "object",
+        "required": ["name", "balance", "rate"],
+        "properties": {
+          "name": { "type": "string", "examples": ["Student Loan A"] },
+          "balance": { "$ref": "#/components/schemas/Money" },
+          "rate": { "$ref": "#/components/schemas/Percentage" }
+        }
+      },
+      "SourceLoans": {
+        "type": "object",
+        "required": ["source", "mode", "source_status", "data"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "source_status": { "$ref": "#/components/schemas/SourceStatus" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/SourceLoanRow" } }
+        },
+        "examples": [
+          { "source": "loans", "mode": "local", "source_status": "connected", "data": [{ "name": "Student Loan A", "balance": "12000.00", "rate": 6.8 }] }
+        ]
+      },
+      "SourceListingRow": {
+        "type": "object",
+        "required": ["address", "price"],
+        "properties": {
+          "address": { "type": "string", "examples": ["123 Example St"] },
+          "price": { "$ref": "#/components/schemas/Money" },
+          "rent_estimate": { "$ref": "#/components/schemas/Money" }
+        }
+      },
+      "SourceListings": {
+        "type": "object",
+        "required": ["source", "mode", "source_status", "data"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "source_status": { "$ref": "#/components/schemas/SourceStatus" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/SourceListingRow" } }
+        },
+        "examples": [
+          { "source": "listings", "mode": "api", "source_status": "connected", "data": [{ "address": "123 Example St", "price": "420000.00", "rent_estimate": "2400.00" }] }
+        ]
+      },
+
+      "LinkTokenCreateRequest": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["transactions", "liabilities", "investments", "income"] },
+            "description": "Plaid products to request on this Link session.",
+            "examples": [["transactions", "liabilities"]]
+          }
+        }
+      },
+      "LinkTokenResponse": {
+        "type": "object",
+        "required": ["link_token", "expiration"],
+        "properties": {
+          "link_token": { "type": "string", "examples": ["link-sandbox-0000-synthetic"] },
+          "expiration": { "$ref": "#/components/schemas/DateTime" }
+        },
+        "examples": [{ "link_token": "link-sandbox-0000-synthetic", "expiration": "2026-05-24T10:30:00Z" }]
+      },
+      "ExchangeRequest": {
+        "type": "object",
+        "required": ["public_token"],
+        "properties": {
+          "public_token": { "type": "string", "examples": ["public-sandbox-0000-synthetic"] }
+        }
+      },
+      "ExchangeResponse": {
+        "type": "object",
+        "required": ["item_id", "status"],
+        "properties": {
+          "item_id": { "type": "string", "examples": ["item-synthetic-001"] },
+          "status": { "$ref": "#/components/schemas/ItemStatus" }
+        },
+        "examples": [{ "item_id": "item-synthetic-001", "status": "connected" }]
+      },
+      "ConnectionItem": {
+        "type": "object",
+        "required": ["item_id", "institution", "products", "status", "sources"],
+        "properties": {
+          "item_id": { "type": "string", "examples": ["item-synthetic-001"] },
+          "institution": { "type": "string", "examples": ["Example Bank"] },
+          "products": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["transactions", "liabilities", "investments", "income"] }
+          },
+          "status": { "$ref": "#/components/schemas/ItemStatus" },
+          "sources": { "type": "array", "items": { "$ref": "#/components/schemas/Source" } },
+          "last_synced": { "$ref": "#/components/schemas/DateTime" }
+        }
+      },
+      "SourceConnection": {
+        "type": "object",
+        "required": ["source", "mode", "status"],
+        "properties": {
+          "source": { "$ref": "#/components/schemas/Source" },
+          "mode": { "$ref": "#/components/schemas/SourceMode" },
+          "status": { "$ref": "#/components/schemas/ItemStatus" }
+        }
+      },
+      "ConnectionsList": {
+        "type": "object",
+        "required": ["items", "sources"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ConnectionItem" } },
+          "sources": { "type": "array", "items": { "$ref": "#/components/schemas/SourceConnection" } }
+        },
+        "examples": [
+          {
+            "items": [
+              { "item_id": "item-synthetic-001", "institution": "Example Bank", "products": ["transactions", "liabilities"], "status": "connected", "sources": ["transactions", "loans"], "last_synced": "2026-05-24T09:00:00Z" }
+            ],
+            "sources": [
+              { "source": "transactions", "mode": "api", "status": "connected" },
+              { "source": "income", "mode": "local", "status": "not_connected" },
+              { "source": "holdings", "mode": "local", "status": "not_connected" },
+              { "source": "loans", "mode": "api", "status": "connected" },
+              { "source": "listings", "mode": "local", "status": "not_connected" }
+            ]
+          }
+        ]
+      },
+      "WebhookRequest": {
+        "type": "object",
+        "required": ["webhook_type", "webhook_code"],
+        "properties": {
+          "webhook_type": { "type": "string", "examples": ["TRANSACTIONS"] },
+          "webhook_code": { "type": "string", "examples": ["SYNC_UPDATES_AVAILABLE"] },
+          "item_id": { "type": "string", "examples": ["item-synthetic-001"] }
+        }
+      },
+      "Acknowledgement": {
+        "type": "object",
+        "required": ["status"],
+        "properties": { "status": { "type": "string", "examples": ["accepted"] } },
+        "examples": [{ "status": "accepted" }]
       }
     }
   }

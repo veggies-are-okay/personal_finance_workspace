@@ -8,6 +8,7 @@
 > - 2026-05-24: Scaffolded `backend-ts/` (NestJS parity twin: `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger` OpenAPI at `/openapi.json`, TypeORM `synchronize: false`, `GET /health` → `{"status":"ok"}`). — P1.3.
 > - 2026-05-24: Built the cross-backend **parity harness** in `contracts/` (Vitest): `npm run test:parity` boots BOTH backends (FastAPI :8765, NestJS :3765 — never :8000), polls `/health` for the real `{"status":"ok"}` body, asserts response parity + structural OpenAPI parity for `/health` against a canonical contract, then tears both down. — P1.4.
 > - 2026-05-24: Scaffolded the **frontend** (`frontend/`): Vite 8 + React 19 + TypeScript (strict) with Tailwind v4 via the `@tailwindcss/vite` plugin (`@import "tailwindcss"` in `src/index.css`). Backend-NEUTRAL: single network boundary `src/lib/api.ts` reads `VITE_API_BASE_URL` (default `http://localhost:8000`) and `getHealth()` GETs `/health`; `src/features/health/HealthStatus.tsx` renders explicit loading/success/error states and shows the active base URL. Vitest (jsdom + RTL, ≥80% coverage, entry/config excluded); scripts `dev`/`build`/`lint`/`test`. — P1.5.
+> - 2026-05-24: Authored the **complete + frozen canonical OpenAPI** in `contracts/openapi.canonical.json` (all view/source/connections paths + `/health`) with Appendix A baked in as reusable components (Money decimal-string, Percentage number, Error envelope → 422, Pagination, enum registry). Added `redocly lint` (`redocly.yaml` + `lint:openapi` script — clean) and a `prism` **mock** (`mock` script). Extended the parity harness: `src/contract.ts` (canonical loader + `IMPLEMENTED_PATHS` allowlist), the structural-diff now scoped to implemented paths (pending = skipped), and per-endpoint value-parity stubs (`endpoints.parity.stubs.test.ts`, `it.todo`) for later branches to fill. `/health` parity stays green. — P2.2.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -48,13 +49,19 @@ personal_finance/
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
 ├── contracts/                 # Cross-backend PARITY HARNESS (Node + Vitest) — enforces Rule #1
-│   ├── openapi.canonical.json #   Canonical contract (agreed shape per endpoint; grows over time)
+│   ├── openapi.canonical.json #   Canonical contract — COMPLETE + FROZEN (P2.2/DA-25): all view +
+│   │                          #     source + connections paths + /health; Appendix A baked in
+│   │                          #     (Money string, Percentage number, Error envelope, Pagination, enums)
+│   ├── redocly.yaml           #   redocly lint config (recommended ruleset, tuned for a local-first app)
 │   ├── src/                   #   backends.ts (spawn/poll/teardown both backends; rogue-:8000 guard) ·
-│   │                          #     global-setup.ts (Vitest globalSetup: boot both, provide base URLs,
-│   │                          #     teardown) · normalize.ts (OpenAPI structural normalizer) · http.ts
-│   ├── test/                  #   health-response.parity · openapi.parity (structural) ·
-│   │                          #     normalize.unit · backends.unit
-│   ├── package.json           #   script `test:parity` (canonical gate; pretest builds both backends)
+│   │                          #     global-setup.ts (Vitest globalSetup) · normalize.ts (OpenAPI
+│   │                          #     structural normalizer) · contract.ts (canonical loader +
+│   │                          #     IMPLEMENTED_PATHS allowlist) · http.ts
+│   ├── test/                  #   health-response.parity · openapi.parity (structural diff, scoped to
+│   │                          #     implemented paths) · endpoints.parity.stubs (it.todo per endpoint) ·
+│   │                          #     normalize.unit · contract.unit · backends.unit
+│   ├── package.json           #   scripts: `test:parity` (canonical gate; pretest builds both backends) ·
+│   │                          #     `lint:openapi` (redocly) · `mock` (prism mock the canonical doc)
 │   ├── vitest.config.ts        #   globalSetup + single-fork · vitest.unit.config.ts (units, no boot)
 │   ├── tsconfig.json · README.md · .gitignore
 │

@@ -1,0 +1,30 @@
+# Redocly lint config for the canonical cross-backend contract.
+#
+# Starts from the `recommended` ruleset and tunes it for THIS API:
+# a local-first, single-user finance app. Rules that do not apply to that
+# shape are turned off deliberately (documented inline); all structural /
+# correctness rules stay on so the spec can't silently rot.
+extends:
+  - recommended
+
+rules:
+  # --- kept ON (structural correctness) ---
+  # no-unused-components, no-invalid-media-type-examples, operation-operationId,
+  # spec, etc. inherit from `recommended`.
+
+  # --- tuned OFF for this contract ---
+  # Local-first, single-user app: there is no app-level auth scheme on the view
+  # endpoints (the only verification is Plaid webhook JWT, which is not an
+  # OpenAPI security scheme). Requiring `security` here would be misleading.
+  security-defined: off
+  # No public license applies to a private personal-finance contract.
+  info-license: off
+  # /health is a bare liveness probe and is intentionally 200-only (it is
+  # DB-independent and never errors); a mandatory 4xx would be noise.
+  operation-4xx-response: off
+  # Summaries are present on every operation; per-2xx response descriptions are
+  # provided. We do not require a `tags`-level description object beyond ours.
+  operation-singular-tag: off
+  # This is a local-first app: the server genuinely IS localhost. The warning
+  # against example.com/localhost URLs does not apply.
+  no-server-example.com: off
