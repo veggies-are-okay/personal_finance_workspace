@@ -1,0 +1,4 @@
+"Date","Transaction","Name","Memo","Amount"
+"2026-01-05","DEBIT","SYNTHETIC HARDWARE STORE","ref; ; ; ; ;","-45.67"
+"2026-01-10","CREDIT","SYNTHETIC STATEMENT CREDIT","ref; ; ; ; ;","30.00"
+"2026-01-18","DEBIT","SYNTHETIC PARKING","ref; ; ; ; ;","-0.25"

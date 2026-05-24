@@ -28,6 +28,7 @@ Run as a script::
     uv run python scripts/extract_chase_statements.py
     uv run python scripts/extract_chase_statements.py --pdf-dir <dir> --out <file.csv>
 """
+
 from __future__ import annotations
 
 import argparse
@@ -176,10 +177,10 @@ def write_csv(transactions: list[Transaction], out_path: Path = DEFAULT_OUT_CSV)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pdf-dir", type=Path, default=DEFAULT_PDF_DIR,
-                        help="Directory of Chase statement PDFs.")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT_CSV,
-                        help="Output CSV path.")
+    parser.add_argument(
+        "--pdf-dir", type=Path, default=DEFAULT_PDF_DIR, help="Directory of Chase statement PDFs."
+    )
+    parser.add_argument("--out", type=Path, default=DEFAULT_OUT_CSV, help="Output CSV path.")
     args = parser.parse_args(argv)
 
     print(f"{'statement':<32}{'#txns':>7}{'extracted':>13}{'summary':>13}  check")
@@ -194,8 +195,9 @@ def main(argv: list[str] | None = None) -> int:
             check = "OK"
         else:
             check = f"MISMATCH (Δ {extracted - summary_total:+.2f})"
-        print(f"{path.name:<32}{len(txns):>7}{extracted:>13.2f}"
-              f"{(summary_total or 0):>13.2f}  {check}")
+        print(
+            f"{path.name:<32}{len(txns):>7}{extracted:>13.2f}{(summary_total or 0):>13.2f}  {check}"
+        )
         grand_total += extracted
         count += len(txns)
 

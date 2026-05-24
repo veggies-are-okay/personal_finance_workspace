@@ -2,6 +2,7 @@
 
 > CHANGELOG
 > - 2026-05-24: Initial structure. Foundation skeleton, rule/skill libraries, ingestion utilities. — Foundation pass.
+> - 2026-05-24: Added `scripts/ledger.py` (multi-source normalizers + combined loader) and `tests/fixtures/` (synthetic CSV fixtures). — P0.3.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -19,8 +20,10 @@ personal_finance/
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python
 ├── contracts/                 # Canonical OpenAPI spec + cross-backend parity tests
 │
-├── scripts/                   # Statement ingestion utilities (e.g. extract_chase_statements.py)
+├── scripts/                   # Statement ingestion utilities: extract_chase_statements.py (PDF→CSV),
+│                              #   ledger.py (per-source normalizers + combined signed-amount ledger)
 ├── tests/                     # Tests for scripts/ (root uv project; conftest.py wires scripts/ onto path)
+│   └── fixtures/              # Small SYNTHETIC CSV fixtures for ingestion tests (never real data)
 │
 ├── config/                    # accounts.example.yaml (committed) + accounts.yaml (gitignored)
 ├── docs/                      # Committed markdown docs + GITIGNORED real data (see below)

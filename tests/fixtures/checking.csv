@@ -1,0 +1,8 @@
+Account Name : Synthetic Free Checking
+Account Number : 00000000X000
+Date Range : 01/01/2026-02/28/2026
+Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number
+"1000000001",02/10/2026,"Deposit","SYNTHETIC PAYROLL DIRECT DEP",,2500.00,3500.00,
+"1000000002",02/12/2026,"Withdrawal","SYNTHETIC RENT PAYMENT",-1200.00,,2300.00,
+"1000000003",02/15/2026,"Withdrawal","",-7.89,,2292.11,
+"1000000004",02/20/2026,"ATM Deposit","SYNTHETIC CASH DEPOSIT",,"1,000.00",3292.11,
