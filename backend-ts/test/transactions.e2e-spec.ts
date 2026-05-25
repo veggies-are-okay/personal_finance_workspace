@@ -13,6 +13,7 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 import { CanonicalExceptionFilter } from '../src/errors/canonical-exception.filter';
@@ -97,6 +98,8 @@ describe('TransactionsController (e2e)', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 

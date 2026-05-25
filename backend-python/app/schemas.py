@@ -215,3 +215,81 @@ class Budget(BaseModel):
     @field_serializer("savings_rate", "effective_tax_rate")
     def _serialize_pct(self, value: Decimal) -> float:
         return _percent_num(value)
+
+
+# --- Goals view (P4.6) -----------------------------------------------------
+#
+# ``GET /api/v1/goals`` is a THIN READ of the ``goals`` table (name, target,
+# saved, progress_pct). The canonical contract (DA-25, frozen) returns ONE
+# summary object: ``target`` + ``saved`` are the aggregate (sum across goals),
+# ``progress_pct`` is the overall ratio, ``funding[]`` lists each goal as a
+# funding source toward the aggregate, and ``affordability{}`` is a fixed-shape
+# object. There is no ``funding``/``affordability`` table in the P2.3 schema, so
+# ``affordability`` is served as well-formed zeros (and an empty DB yields zeros
+# + an empty ``funding`` list). Both backends compose this identically from the
+# SAME rows so the bodies are byte-identical (DA-9).
+#
+# Wire conventions (Appendix A): money is a fixed-2dp decimal STRING (DA-2);
+# ``progress_pct``/``income_share`` are JSON NUMBERS on a 0-100 scale (DA-22).
+
+
+class GoalFunding(BaseModel):
+    """One funding source toward the goals total (``/goals.funding[]``).
+
+    Composed from a ``goals`` row: ``source`` is the goal name, ``amount`` is its
+    saved balance (a decimal string).
+    """
+
+    source: str
+    amount: Decimal
+
+    @field_serializer("amount")
+    def _serialize_amount(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class Affordability(BaseModel):
+    """Home-affordability block (``/goals.affordability``).
+
+    No backing table exists in the P2.3 schema, so every field is served as a
+    well-formed zero. Money fields are decimal strings; ``income_share`` is a
+    numeric percentage (0-100).
+    """
+
+    price: Decimal
+    down_payment: Decimal
+    mortgage: Decimal
+    monthly_piti: Decimal
+    income_share: Decimal
+
+    @field_serializer("price", "down_payment", "mortgage", "monthly_piti")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+    @field_serializer("income_share")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+
+class Goals(BaseModel):
+    """The full ``GET /api/v1/goals`` response (design §3).
+
+    ``target``/``saved`` are decimal strings; ``progress_pct`` is a numeric
+    percentage (0-100); ``funding`` lists each goal as a source; ``affordability``
+    is the (zero-filled) home block. Empty DB -> ``target``/``saved`` ``"0.00"``,
+    ``progress_pct`` ``0``, empty ``funding``, zero ``affordability``.
+    """
+
+    target: Decimal
+    saved: Decimal
+    progress_pct: Decimal
+    funding: list[GoalFunding]
+    affordability: Affordability
+
+    @field_serializer("target", "saved")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+    @field_serializer("progress_pct")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)

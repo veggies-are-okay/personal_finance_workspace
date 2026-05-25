@@ -73,8 +73,10 @@
   - *Verify:* Appendix B gates + parity; concentration/allocation numeric percentages (Appendix A).
 ### P4.5 — `GET /api/v1/debt`  *(type: BE)* — Both backends + parity.
   - *Verify:* Appendix B gates + parity; `payoff_strategy`/`loan_priority` enums per registry; avalanche vs minimums both covered.
-### P4.6 — `GET /api/v1/goals`  *(type: BE)* — Both backends + parity.
+### P4.6 — `GET /api/v1/goals`  *(type: BE)* — [x]
+- [x] Both backends read the `goals` table only (thin read).
   - *Verify:* Appendix B gates + parity; money decimal-string.
+  - *Done (2026-05-24):* FastAPI `app/routers/goals.py` + `Goals`/`GoalFunding`/`Affordability` Pydantic models in `app/schemas.py`; NestJS `src/goals/` (controller + service reading the `goals` repo, `toCents`/`centsToString` exact-sum helpers). Thin read of the `goals` table composed into the frozen canonical shape — **no recompute** (DA-23): `target`/`saved` summed (money decimal-string), `progress_pct` the overall ratio (numeric 0–100, DA-22), `funding[]` one `{source,amount}` per goal sorted by name, `affordability{}` a zero-filled block (no backing table in the P2.3 schema). Empty DB → `"0.00"`/`0`/empty funding/zero affordability. DB-down → canonical 503 (DA-18). `contracts/test/goals.parity.test.ts` covers cross-backend identity (DA-9) + empty-DB + DB-down 503; `seedGoalsFixture`/`cleanupGoalsFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` adds the path (OpenAPI structural diff clean). Gates: Python 7 goals tests (suite 99% cov); TS 122 tests / 88.5% cov; parity 57 passed.
 
 ## P5 — Frontend (built against the mock, then wired)
 ### P5.1 — App shell + core screens  *(type: FE — `FE/core-screens`)*

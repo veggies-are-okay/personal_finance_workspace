@@ -232,3 +232,52 @@ export async function seedBudgetFixture(): Promise<void> {
     }
   });
 }
+
+// --- Goals fixture (P4.6) --------------------------------------------------
+//
+// The Goals view is a THIN READ of the `goals` table (DA-23), so the
+// cross-backend identity test (DA-9) pins those rows. Goals are keyed by a
+// unique id range + name prefix so cleanup never touches other data. Rows are
+// inserted out of name order to prove both backends sort `funding` identically.
+
+/** A synthetic goal row mirrored across both backends. */
+export interface SeedGoal {
+  id: number;
+  name: string;
+  target: string; // decimal string
+  saved: string; // decimal string
+}
+
+/** The fixed synthetic goals both backends serve in the goals parity test. */
+export const SEED_GOALS: SeedGoal[] = [
+  // Out of name order (Vacation before Emergency Fund) -> both must sort by name.
+  { id: 980002, name: "ParityP46 Vacation", target: "10000.00", saved: "6000.00" },
+  {
+    id: 980001,
+    name: "ParityP46 Emergency Fund",
+    target: "50000.00",
+    saved: "15000.00",
+  },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupGoalsFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM goals WHERE id = ANY($1::bigint[])", [
+      SEED_GOALS.map((g) => g.id),
+    ]);
+  });
+}
+
+/** Insert the synthetic goals fixture (cleans first). */
+export async function seedGoalsFixture(): Promise<void> {
+  await cleanupGoalsFixture();
+  await withClient(async (client) => {
+    for (const g of SEED_GOALS) {
+      await client.query(
+        "INSERT INTO goals (id, name, target, saved) VALUES ($1, $2, $3, $4)",
+        [g.id, g.name, g.target, g.saved],
+      );
+    }
+  });
+}

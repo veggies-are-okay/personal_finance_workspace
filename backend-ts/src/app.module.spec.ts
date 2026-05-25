@@ -16,6 +16,7 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from './entities/entities';
 import { HealthController } from './health/health.controller';
@@ -136,6 +137,8 @@ describe('AppModule', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 

@@ -13,6 +13,7 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 
@@ -54,6 +55,8 @@ describe('HealthController (e2e)', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 
