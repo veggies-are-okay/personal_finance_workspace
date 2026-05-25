@@ -30,7 +30,7 @@ Count files (`git diff --name-only main... | wc -l`) and pick the tier. **Always
 | **Medium** | **6–10** | Group by **subdirectory / module**. |
 | **Large** | **> 10** | **High-level / conceptual by realm** — discuss the design, not every file. |
 
-Every PR body / `pull_requests/<slug>.md`: **H1 title · Summary · Changes (at tier granularity) · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Under ~4000 chars.
+Every PR body / `pull_requests/<slug>.md`: **H1 title · Summary · Changes (at tier granularity) · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Under ~4000 chars. **The GitHub PR body IS this doc** — open with `gh pr create --base main --body-file pull_requests/<slug>.md` (the full description inline; **never** just a pointer like "see the doc").
 
 ---
 
@@ -46,6 +46,13 @@ Beyond green gates, every feature-bearing PR shows **evidence the happy path wor
 | **Data / ingestion / DB** | Output of an **ad-hoc query script** (row counts, dedupe proof) or a log excerpt demonstrating the invariant. |
 
 Prefer **observable behavior** (real request/response, rendered screen, query result) over asserting internals. Never paste real balances/transactions/account numbers.
+
+**Embed the proof as a committed Playwright screenshot** (required for every feature-bearing PR; docs-only PRs may instead state "docs-only, CI green"). Capture ≥1 screenshot, commit it under `pull_requests/evidence/<slug>/`, and embed it in the PR doc via a **commit-SHA raw URL** — `https://raw.githubusercontent.com/<owner>/<repo>/<sha>/pull_requests/evidence/<slug>/<file>.png` (use the SHA, **not** the branch name — our branch names contain `/` and won't resolve as raw refs). The Playwright **MCP** is pinned to system Chrome (needs sudo to install); use the **Playwright CLI** with bundled Chromium instead (`npx playwright install chromium` once). Capture method by change type:
+- **Terminal / DB / CLI:** pipe the REAL command/test output to a file, then `scripts/evidence_term_shot.sh <output.txt> pull_requests/evidence/<slug>/proof.png "<title>"`.
+- **Backend endpoint:** screenshot the running `/docs` (Swagger) or a `npx playwright screenshot "<url>"` of the JSON response (both backends for a parity change).
+- **Frontend:** `npx playwright screenshot` of the rendered screen (or the mock).
+
+To embed durably: commit the PNG first, `git rev-parse HEAD` for its SHA, put that SHA in the doc's image URL, then commit the doc.
 
 ---
 

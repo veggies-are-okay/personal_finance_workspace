@@ -54,7 +54,7 @@ git diff --name-only main... | wc -l      # pick the tier (≤5 small / 6–10 m
 git diff main --stat ; git log main..HEAD --oneline
 ```
 
-Write `pull_requests/<slug>.md` at the tier's granularity (§2): **H1 · Summary · Changes · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Capture the **happy-path evidence** that fits the change (Playwright screenshot / OpenAPI + endpoint ping / docker-compose logs / ad-hoc DB query). No financial data — synthetic only.
+Write `pull_requests/<slug>.md` at the tier's granularity (§2): **H1 · Summary · Changes · Feature mapping · Happy-path verification (§3) · Test plan (gate results) · Checklist.** Capture the **happy-path evidence** that fits the change and **commit it as a Playwright screenshot** under `pull_requests/evidence/<slug>/` (run `scripts/evidence_term_shot.sh <captured-output.txt> … "<title>"` for terminal/DB proofs; screenshot the live `/docs`/screen for endpoints/UI), then embed it in the doc via a **commit-SHA raw URL** (`pull-requests.md` §3). No financial data — synthetic only.
 
 ### Step 5 — Commit & push the branch
 
@@ -76,7 +76,7 @@ Commit the PR doc + any README/STRUCTURE/checklist updates in the same commit. T
 ### Step 6 — Open the PR & run the reviewer pass
 
 ```bash
-gh pr create --base main --head <branch-name> --title "<title>" --body "<mirror of the PR doc>"
+gh pr create --base main --head <branch-name> --title "<title>" --body-file pull_requests/<slug>.md
 ```
 
 Then run the **reviewer checklist** (`pull-requests.md` §4) over the diff — optionally invoke the `code-review` or `pr-review-toolkit:review-pr` skill. Use Conventional Comments; **block only on correctness/security/major-design**, not nits. Resolve any blockers (push fixes to the branch) before merging.

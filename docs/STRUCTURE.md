@@ -18,6 +18,8 @@
 
 > - 2026-05-24: **Ingestion → DB loader** (P3.1). Added `backend-python/app/ingestion/loader.py`: an idempotent loader that upserts the normalized signed-amount ledger into `transactions` on the unique `dedupe_key` = `sha256(account, date, signed_amount, normalized_description)` (DA-19) — re-import is an upsert, not a duplicate; money is `Decimal`. The DB-writing loader lives in `backend-python/` (under the `python-backend` CI gate); the raw→normalized-CSV normalizers stay in `scripts/`. Integration tests (`tests/test_loader.py`) run against the live Postgres service. — P3.1.
 
+> - 2026-05-24: Added `scripts/evidence_term_shot.sh` (renders terminal output → PNG via the Playwright CLI) and standardized PR happy-path **screenshots** + full **inline** PR bodies (`gh pr create --body-file`). — PR evidence.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level

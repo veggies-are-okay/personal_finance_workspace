@@ -15,7 +15,7 @@ This skill drives `plans/agent_checklist.md` one subsection at a time for a **lo
 
 **RULE #1 — BACKEND PARITY:** every route, request/response schema, validation rule, error shape, and status code is implemented IDENTICALLY in both backends, in the SAME branch. Verified by OpenAPI diff + `contracts/` parity tests. Never let the backends drift.
 
-**INTEGRATION (supersedes the local `git merge --no-ff` steps below):** `main` is **protected** — PR-only, and the four CI checks (`python-backend`, `ts-backend`, `frontend`, `parity`) must be green before merge. Finalize each subsection's branch via the **`branch-finalization`** skill: push the branch → open a CI-gated PR (`gh pr create --base main`) → **merge on green** (`gh pr merge --merge --delete-branch`). **Never local-merge to `main`** (protection rejects it). See `.claude/rules/pull-requests.md`.
+**INTEGRATION (supersedes the local `git merge --no-ff` steps below):** `main` is **protected** — PR-only, and the four CI checks (`python-backend`, `ts-backend`, `frontend`, `parity`) must be green before merge. Finalize each subsection's branch via the **`branch-finalization`** skill: push the branch → open a CI-gated PR (`gh pr create --base main`) → **merge on green** (`gh pr merge --merge --delete-branch`). **Never local-merge to `main`** (protection rejects it). Open the PR with `--body-file pull_requests/<slug>.md` (full inline body); each branch commits a **Playwright happy-path screenshot** under `pull_requests/evidence/<slug>/` (via `scripts/evidence_term_shot.sh`) embedded by commit-SHA raw URL. See `.claude/rules/pull-requests.md`.
 
 ## Meta-runner mode (default for "run the whole checklist")
 
