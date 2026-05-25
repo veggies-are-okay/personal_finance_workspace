@@ -17,6 +17,7 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   HoldingEntity,
+  LoanEntity,
   RecurringChargeEntity,
   TransactionEntity,
 } from './entities/entities';
@@ -142,6 +143,8 @@ describe('AppModule', () => {
       .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue({})
       .compile();
 

@@ -6,6 +6,7 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
 import { BudgetModule } from './budget/budget.module';
+import { DebtModule } from './debt/debt.module';
 import { ALL_ENTITIES } from './entities/entities';
 import { HealthModule } from './health/health.module';
 import { InvestmentsModule } from './investments/investments.module';
@@ -91,6 +92,7 @@ export async function resilientDataSourceFactory(
     BudgetModule,
     NetWorthModule,
     InvestmentsModule,
+    DebtModule,
   ],
 })
 export class AppModule {}

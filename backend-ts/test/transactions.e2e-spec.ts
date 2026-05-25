@@ -14,6 +14,7 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   HoldingEntity,
+  LoanEntity,
   RecurringChargeEntity,
   TransactionEntity,
 } from '../src/entities/entities';
@@ -103,6 +104,8 @@ describe('TransactionsController (e2e)', () => {
       .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue({})
       .compile();
 

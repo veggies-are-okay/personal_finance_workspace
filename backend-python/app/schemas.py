@@ -378,3 +378,104 @@ class Investments(BaseModel):
     @field_serializer("portfolio_value", "unrealized_gain")
     def _serialize_money(self, value: Decimal) -> str:
         return _money_str(value)
+
+
+# --- Debt view (P4.5) ------------------------------------------------------
+#
+# ``GET /api/v1/debt`` is a THIN READ of the ``loans`` table (no recompute of
+# the rows themselves): it sums balances/minimums, derives the weighted-average
+# rate, groups loans into rate tranches, and projects two deterministic payoff
+# scenarios (avalanche = highest-rate-first acceleration; minimums = pay only
+# the minimums). Both backends run the SAME integer-cent amortization so the
+# projections are byte-identical (DA-9).
+#
+# Wire conventions (Appendix A): balances/payments/interest are fixed-2dp
+# decimal STRINGS (DA-2); ``rate``/``weighted_avg_rate`` are JSON NUMBERS 0-100
+# (DA-22); ``loan_priority``/``payoff_strategy`` are the lower_snake enum values
+# from the canonical registry shared with ``app.models``.
+
+
+class LoanPriority(str, Enum):
+    """Payoff priority of a loan tranche (Appendix A registry; lower_snake)."""
+
+    pay_first = "pay_first"
+    then = "then"
+    minimums = "minimums"
+
+
+class PayoffStrategy(str, Enum):
+    """Debt payoff strategy (Appendix A registry; lower_snake)."""
+
+    avalanche = "avalanche"
+    minimums = "minimums"
+
+
+class LoanOut(BaseModel):
+    """One loan row in ``/debt.loans[]`` (design §3)."""
+
+    name: str
+    balance: Decimal
+    rate: Decimal
+    minimum_payment: Decimal
+    priority: LoanPriority
+
+    @field_serializer("rate")
+    def _serialize_rate(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+    @field_serializer("balance", "minimum_payment")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class DebtTranche(BaseModel):
+    """One rate tranche in ``/debt.tranches[]`` (loans grouped by rate)."""
+
+    rate: Decimal
+    balance: Decimal
+    loan_count: int
+    priority: LoanPriority
+
+    @field_serializer("rate")
+    def _serialize_rate(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+    @field_serializer("balance")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class PayoffProjection(BaseModel):
+    """One payoff scenario in ``/debt.payoff[]`` (avalanche or minimums)."""
+
+    strategy: PayoffStrategy
+    debt_free_year: int
+    total_interest: Decimal
+
+    @field_serializer("total_interest")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class Debt(BaseModel):
+    """The full ``GET /api/v1/debt`` response (design §3).
+
+    Empty DB -> well-formed zeros: ``total``/``monthly_minimum`` ``"0.00"``,
+    ``weighted_avg_rate`` ``0``, empty ``tranches``/``loans``, and two
+    zero-interest payoff projections (``debt_free_year`` ``0``).
+    """
+
+    total: Decimal
+    weighted_avg_rate: Decimal
+    monthly_minimum: Decimal
+    tranches: list[DebtTranche]
+    payoff: list[PayoffProjection]
+    loans: list[LoanOut]
+
+    @field_serializer("total", "monthly_minimum")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+    @field_serializer("weighted_avg_rate")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
