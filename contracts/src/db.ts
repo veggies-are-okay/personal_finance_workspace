@@ -232,3 +232,68 @@ export async function seedBudgetFixture(): Promise<void> {
     }
   });
 }
+
+// --- Debt fixture (P4.5) ---------------------------------------------------
+//
+// The Debt view reads the `loans` table directly (a thin read; the payoff
+// projections are derived deterministically and identically in both backends,
+// DA-9). The fixture pins three SYNTHETIC loans spanning the rate/priority
+// registry, keyed by a unique name prefix so cleanup never touches other data.
+// Rows are inserted out of rate order to prove both backends sort identically.
+
+const DEBT_NAME_PREFIX = 'ParityP45 ';
+
+/** The fixed synthetic loans both backends serve in the debt parity test. */
+export const SEED_LOANS = [
+  // out of rate order on purpose -> both backends must emit rate desc.
+  {
+    name: `${DEBT_NAME_PREFIX}Loan B`,
+    balance: '8000.00',
+    rate: '4.5',
+    minimumPayment: '100.00',
+    priority: 'then',
+  },
+  {
+    name: `${DEBT_NAME_PREFIX}Loan A`,
+    balance: '12000.00',
+    rate: '6.8',
+    minimumPayment: '150.00',
+    priority: 'pay_first',
+  },
+  {
+    name: `${DEBT_NAME_PREFIX}Loan C`,
+    balance: '6560.00',
+    rate: '3.2',
+    minimumPayment: '70.00',
+    priority: 'minimums',
+  },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupDebtFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query('DELETE FROM loans WHERE name LIKE $1', [
+      `${DEBT_NAME_PREFIX}%`,
+    ]);
+  });
+}
+
+/** Insert the synthetic loans fixture (cleans first). */
+export async function seedDebtFixture(): Promise<void> {
+  await cleanupDebtFixture();
+  await withClient(async (client) => {
+    for (const loan of SEED_LOANS) {
+      await client.query(
+        `INSERT INTO loans (name, balance, rate, minimum_payment, priority)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          loan.name,
+          loan.balance,
+          loan.rate,
+          loan.minimumPayment,
+          loan.priority,
+        ],
+      );
+    }
+  });
+}

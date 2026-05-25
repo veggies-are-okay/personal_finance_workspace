@@ -71,8 +71,9 @@
   - *Verify:* Appendix B gates + parity; empty-DB → zeros/empty arrays, identical both backends.
 ### P4.4 — `GET /api/v1/investments`  *(type: BE)* — Both backends + parity.
   - *Verify:* Appendix B gates + parity; concentration/allocation numeric percentages (Appendix A).
-### P4.5 — `GET /api/v1/debt`  *(type: BE)* — Both backends + parity.
+### P4.5 — `GET /api/v1/debt`  *(type: BE)* — [x] Both backends + parity.
   - *Verify:* Appendix B gates + parity; `payoff_strategy`/`loan_priority` enums per registry; avalanche vs minimums both covered.
+  - *Done (2026-05-24):* FastAPI `app/routers/debt.py` + `Debt`/`DebtTranche`/`PayoffProjection`/`LoanOut`/`LoanPriority`/`PayoffStrategy` in `app/schemas.py`; NestJS `src/debt/` (controller + `DebtQueryDto` `@IsIn` + service reading the `loans` repo). Thin read of `loans` → `total`, balance-weighted `weighted_avg_rate` (numeric 0–100), `monthly_minimum`, rate `tranches[]` (grouped by rate+priority), `loans[]`, and BOTH `payoff[]` projections — **avalanche** (highest-rate-first acceleration) and **minimums** — from a deterministic **integer-cent amortization** (`project_payoff`/`projectPayoff`) implemented identically in both backends so `debt_free_year`/`total_interest` match to the cent (DA-9). `payoff_strategy`/`loan_priority` use the `app.models` enum registry; optional `strategy` query validates against it (unknown → 422) without changing the body; empty DB → zeros + empty arrays + two zero projections; DB-down → canonical 503 (DA-18). `contracts/test/debt.parity.test.ts` covers cross-backend identity + avalanche-vs-minimums + strategy-422 + DB-down 503; `seedDebtFixture`/`cleanupDebtFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` adds the path (OpenAPI structural diff clean). Gates: Python 150 tests / 99% cov; TS 134 tests / 93.6% cov; parity 58 passed.
 ### P4.6 — `GET /api/v1/goals`  *(type: BE)* — Both backends + parity.
   - *Verify:* Appendix B gates + parity; money decimal-string.
 
