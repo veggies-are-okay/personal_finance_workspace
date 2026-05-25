@@ -37,6 +37,8 @@
 
 > - 2026-05-24: **Docker dual-frontend stack** (P7.1, INFRA). `docker compose up --build` now runs the WHOLE stack: `postgres`, a one-shot `migrate` (backend-python image → `alembic upgrade head`, gated on `postgres` healthy), **both** backends (`backend-python` :8000, `backend-ts` :3000 — gated on `migrate` completed + `postgres` healthy, each with a `/health` healthcheck), and the SAME frontend image built twice — `frontend-python` (**:8501** → FastAPI) and `frontend-ts` (**:8502** → NestJS). Added `backend-python/Dockerfile` (multi-stage uv: `uv sync --locked` deps layer → slim runtime with the venv + `app/`/`alembic/`/`alembic.ini`, uvicorn on 0.0.0.0:8000), `backend-ts/Dockerfile` (multi-stage node: `npm ci` + `nest build` → prod-only runtime running `node dist/main.js` on :3000), `frontend/Dockerfile` + `frontend/nginx.conf.template` (build SPA with `VITE_API_BASE_URL=/api` → `nginx:alpine` serving the SPA with `try_files … /index.html` AND reverse-proxying `/api/` to `${BACKEND_UPSTREAM}` via built-in envsubst, `NGINX_ENVSUBST_FILTER=^BACKEND_`; trailing-slash `proxy_pass` strips the `/api` prefix → same-origin, no CORS), and `.dockerignore` in each (exclude venv/node_modules/tests/`.env`). Backends are NOT published to the host (host :8000 often occupied); Postgres host-publish moved to **5433** (host :5432 often occupied), internal `postgres:5432` unchanged; `pf_pgdata` retained. Frontend fix (FE, no contract change): `src/lib/api.ts` `buildUrl` resolves a **relative** base (`/api`) against `window.location.origin` so `new URL()` works under the proxy (+ test). FE gate green; app gates unaffected (Docker/compose/nginx only). — P7.1.
 
+> - 2026-05-24: **Backend ingestion service** (P8.1, BE-PY — Python-only ingestion surface). Added the file-upload onboarding backend: `POST /api/v1/ingest/{source}` (multipart, `source ∈ {transactions, income, holdings, accounts, loans}`) in `backend-python/app/ingestion/router.py` — FastAPI ONLY. `transactions` detects each file's type (CSV header signature → amex/chase/checking/elan; `.pdf` → Chase extractor) → normalize → `load_ledger` → `run_precompute` for `12m`+`all`; `income` reads paystub PDF(s)/`paystubs.csv` → `load_paystubs` → precompute; `holdings`/`accounts`/`loans` snapshot-replace via new loaders. New loaders: `app/ingestion/holdings_loader.py` (E*TRADE positions CSV → `holdings`, derives weight), `accounts_loader.py` (`accounts.yaml` → `accounts`), `loans_loader.py` (flexible loan CSV → `loans`, tolerant of header variants); plus `income_loader.parse_paystubs_csv`. **Containerization:** the pure extraction logic moved to canonical `app/ingestion/` modules — `extract_chase.py`, `extract_paystubs.py`, `normalize_ledger.py` (so the Docker image, which copies only `app/`, can run them); the repo-root `scripts/extract_chase_statements.py`/`extract_paystubs.py`/`ledger.py` became **thin CLI wrappers** importing from `app` (root `uv run pytest` stays green, 56 tests). Added `pdfplumber` + `pyyaml` + `python-multipart` to `backend-python/pyproject.toml`. Errors use the canonical **422** (no/empty/unparseable file, unknown source) / **503** (DB) envelope; file contents are never logged. **Parity carve-out:** ingestion is Python-owned and OUT of the read-parity contract (like Alembic owns migrations) — `/api/v1/ingest/*` is NOT in `openapi.canonical.json`; `contracts/src/contract.ts` gained `isIngestPath()`/`INGEST_PATH_PREFIX` and `openapi.parity.test.ts` a subset guard (the carve-out is the only allowed FastAPI divergence; NestJS exposes none of the ingest paths); documented in `.claude/rules/backend-parity.md`. Python gate 90%+ coverage; parity gate green; `docker compose build backend-python` installs pdfplumber. — P8.1.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -74,7 +76,12 @@ personal_finance/
 │   │                          #     schema_export.py (normalized snapshot for the parity check) ·
 │   │                          #     ingestion/loader.py (P3.1: idempotent normalized-ledger → transactions
 │   │                          #       upsert on the DA-19 dedupe_key) · ingestion/income_loader.py (P3.2:
-│   │                          #       idempotent pay stubs → paystubs upsert) ·
+│   │                          #       idempotent pay stubs → paystubs upsert; P8.1 parse_paystubs_csv) ·
+│   │                          #     ingestion/router.py (P8.1 POST /api/v1/ingest/{source}, PYTHON-ONLY: detect→
+│   │                          #       normalize→load→precompute; carved out of read parity) · ingestion/
+│   │                          #       extract_chase.py + extract_paystubs.py + normalize_ledger.py (P8.1 canonical
+│   │                          #       extractors under app/ so the Docker image runs them; scripts/* are thin
+│   │                          #       wrappers) · ingestion/{holdings,accounts,loans}_loader.py (P8.1 snapshot loaders) ·
 │   │                          #     precompute/ (P3.2 Python-only analytics: categorize · rates · recurring ·
 │   │                          #       pipeline.run_precompute → budget_* aggregates + recurring_charges) ·
 │   │                          #     errors.py (P4.1 canonical error envelope; validation→422, DB-down→503) ·
@@ -156,8 +163,10 @@ personal_finance/
 │   ├── tsconfig.json · README.md · .gitignore
 │
 
-├── scripts/                   # Statement ingestion utilities: extract_chase_statements.py (PDF→CSV),
-│                              #   ledger.py (per-source normalizers + combined signed-amount ledger)
+├── scripts/                   # Statement ingestion CLIs — THIN WRAPPERS (P8.1) re-exporting the canonical
+│                              #   extractors from backend-python/app/ingestion/: extract_chase_statements.py
+│                              #   (→ app.ingestion.extract_chase, PDF→CSV) · extract_paystubs.py · ledger.py
+│                              #   (→ app.ingestion.normalize_ledger, per-source signed-amount normalizers)
 ├── tests/                     # Tests for scripts/ (root uv project; conftest.py wires scripts/ onto path)
 │   └── fixtures/              # Small SYNTHETIC CSV fixtures for ingestion tests (never real data)
 │

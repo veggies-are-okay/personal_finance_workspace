@@ -27,6 +27,7 @@ import {
 } from "../src/normalize";
 import {
   IMPLEMENTED_PATHS,
+  isIngestPath,
   loadCanonical,
   opKey,
   partitionOperations,
@@ -125,6 +126,35 @@ describe("canonical contract — structural diff vs both backends", () => {
         ).toEqual(expected);
       }
     }
+  });
+
+  it("Python exposes no paths beyond canonical EXCEPT the /ingest carve-out (P8.1)", () => {
+    // Ingestion is Python-owned and OUT of the read-parity contract (like
+    // Alembic owning migrations): /api/v1/ingest/* lives in FastAPI only and is
+    // NOT in the canonical doc. This guard asserts the carve-out is the ONLY
+    // allowed divergence — every other Python path MUST exist in canonical, so
+    // genuine drift (an accidental extra endpoint) still fails the gate. See
+    // .claude/rules/backend-parity.md.
+    const canonicalApi: NormalizedApi = normalizeApi(canonical);
+    const pyApi: NormalizedApi = normalizeApi(pyDoc);
+
+    const unexpected = Object.keys(pyApi)
+      .filter((path) => !isIngestPath(path)) // ignore the Python-only ingest surface
+      .filter((path) => canonicalApi[path] === undefined);
+
+    expect(
+      unexpected,
+      `FastAPI exposes path(s) absent from the canonical contract (and not the ` +
+        `/ingest carve-out): ${unexpected.join(", ")}`,
+    ).toEqual([]);
+
+    // And NestJS must expose NONE of the ingest paths (Python-only surface).
+    const tsApi: NormalizedApi = normalizeApi(tsDoc);
+    const tsIngest = Object.keys(tsApi).filter((path) => isIngestPath(path));
+    expect(
+      tsIngest,
+      `NestJS must NOT implement the Python-only ingest surface: ${tsIngest.join(", ")}`,
+    ).toEqual([]);
   });
 
   it("the canonical contract declares the full P2.2 path inventory (frozen)", () => {

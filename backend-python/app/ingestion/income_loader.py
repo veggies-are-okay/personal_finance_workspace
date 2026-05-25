@@ -25,7 +25,9 @@ Conventions
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date as date_cls
@@ -184,3 +186,58 @@ def load_paystubs(session: Session, entries: Sequence[object]) -> int:
 def paystub_count(session: Session) -> int:
     """Total rows currently in ``paystubs`` (helper for proofs/tests)."""
     return session.scalar(select(func.count()).select_from(Paystub)) or 0
+
+
+# --- paystubs.csv parsing (P8.1 income ingest) --------------------------------
+# The wide CSV that ``scripts/extract_paystubs.py`` emits carries far more
+# columns than ``paystubs`` needs. This reads just the loader's required fields
+# (mirrors load_local.py's parsing) so the /ingest/income endpoint can accept a
+# pre-extracted paystubs.csv as well as raw PDFs.
+
+_REQUIRED_CSV_COLUMNS = ("employer", "period_start", "period_end", "pay_date")
+
+
+def _csv_money(raw: str | None) -> Decimal:
+    """Parse a money cell from paystubs.csv; blank/unparseable -> 0.00."""
+    text = (raw or "").replace(",", "").replace("$", "").strip()
+    if not text:
+        return Decimal("0.00")
+    try:
+        return Decimal(text)
+    except (ValueError, ArithmeticError):
+        return Decimal("0.00")
+
+
+def parse_paystubs_csv(text: str) -> list[PaystubRow]:
+    """Parse a ``paystubs.csv`` document into ``PaystubRow`` records.
+
+    Reads only the columns the ``paystubs`` table needs (employer, the three
+    dates, and the SUMMARY/401(k) money fields). Rows missing a required field
+    or with an unparseable date are skipped so a partially-malformed export
+    still loads the good rows. A document with no recognized header yields ``[]``.
+    """
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames or not all(c in reader.fieldnames for c in _REQUIRED_CSV_COLUMNS):
+        return []
+
+    rows: list[PaystubRow] = []
+    for record in reader:
+        try:
+            rows.append(
+                PaystubRow(
+                    employer=(record.get("employer") or "").strip(),
+                    period_start=date_cls.fromisoformat((record.get("period_start") or "").strip()),
+                    period_end=date_cls.fromisoformat((record.get("period_end") or "").strip()),
+                    pay_date=date_cls.fromisoformat((record.get("pay_date") or "").strip()),
+                    gross_pay=_csv_money(record.get("gross_pay")),
+                    net_pay=_csv_money(record.get("net_pay")),
+                    taxes=_csv_money(record.get("taxes")),
+                    deductions=_csv_money(record.get("deductions")),
+                    reimbursements=_csv_money(record.get("reimbursements")),
+                    retirement_401k_employee=_csv_money(record.get("retirement_401k_employee")),
+                    retirement_401k_employer=_csv_money(record.get("retirement_401k_employer")),
+                )
+            )
+        except ValueError:
+            continue  # skip a malformed/blank row (bad date)
+    return rows

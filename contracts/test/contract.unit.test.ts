@@ -18,7 +18,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   IMPLEMENTED_PATHS,
+  INGEST_PATH_PREFIX,
   canonicalOperationKeys,
+  isIngestPath,
   loadCanonical,
   opKey,
   partitionOperations,
@@ -78,6 +80,28 @@ describe("canonical contract — frozen path inventory (P2.2 / DA-25)", () => {
     expect(pending).not.toContain(opKey("POST", "/api/v1/connections/webhook"));
     expect(pending).not.toContain(opKey("GET", "/api/v1/connections"));
     expect([...implemented, ...pending].sort()).toEqual(EXPECTED_INVENTORY);
+  });
+});
+
+describe("ingestion carve-out (P8.1) — Python-owned, out of read parity", () => {
+  it("identifies /api/v1/ingest/* as the ingest carve-out", () => {
+    expect(isIngestPath(INGEST_PATH_PREFIX)).toBe(true);
+    expect(isIngestPath(`${INGEST_PATH_PREFIX}/transactions`)).toBe(true);
+    expect(isIngestPath(`${INGEST_PATH_PREFIX}/{source}`)).toBe(true);
+  });
+
+  it("does NOT match read-API or look-alike paths", () => {
+    expect(isIngestPath("/api/v1/transactions")).toBe(false);
+    expect(isIngestPath("/api/v1/connections")).toBe(false);
+    // a path that merely starts with the same letters but is a different segment
+    expect(isIngestPath("/api/v1/ingestion-status")).toBe(false);
+    expect(isIngestPath("/health")).toBe(false);
+  });
+
+  it("the canonical contract declares NO ingest path (Python-only surface)", () => {
+    // The /ingest endpoints must never enter the canonical read contract.
+    const keys = canonicalOperationKeys(loadCanonical());
+    expect(keys.some((k) => k.includes(INGEST_PATH_PREFIX))).toBe(false);
   });
 });
 

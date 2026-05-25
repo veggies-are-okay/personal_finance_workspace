@@ -42,6 +42,15 @@ Both backends read/write the **same Postgres schema**, so for the same request a
 - **Null vs absent:** decide per field and apply it the same way in both backends.
 - **Validation messages/codes:** align error `detail`/`message` structure so clients (and the parity tests) can't tell which backend answered.
 
+## Python-owned ingestion (out of read parity, P8.1)
+
+**Ingestion/extraction is Python-owned and intentionally OUT of the 1:1 read-parity contract — exactly like Alembic owning migrations.** Only the **read API** (the six view endpoints + connections) is held at strict parity.
+
+- The upload/extract/load endpoints — `POST /api/v1/ingest/{source}`, `source ∈ {transactions, income, holdings, accounts, loans}` — exist in the **FastAPI backend ONLY**. They depend on Python-only libraries (pdfplumber for PDF statements/pay-stubs, PyYAML for `accounts.yaml`, pandas), so duplicating them in NestJS would add no learning value and a lot of drift risk.
+- **NestJS does NOT implement `/ingest/*`,** and these paths are **NOT** in `contracts/openapi.canonical.json`.
+- The parity harness **ignores `/api/v1/ingest/*`** when diffing the Python backend's `/openapi.json` against canonical (`isIngestPath()` / `INGEST_PATH_PREFIX` in `contracts/src/contract.ts`). A positive subset guard asserts the carve-out is the **only** allowed divergence: every other Python path must exist in canonical, and NestJS must expose none of the ingest paths — so genuine drift (an accidental extra read endpoint) still fails the gate.
+- Pure extraction logic is the canonical `app/ingestion/` modules (`extract_chase.py`, `extract_paystubs.py`, `normalize_ledger.py`) so the containerized backend can run it; the repo-root `scripts/*` are thin CLI wrappers that import from `app`.
+
 ## Database schema parity
 
 - **Alembic (Python) is the canonical owner of migrations.** The Postgres schema is defined and evolved there.

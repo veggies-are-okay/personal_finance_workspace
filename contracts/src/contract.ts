@@ -43,6 +43,28 @@ export function opKey(method: string, path: string): OperationKey {
 }
 
 /**
+ * Ingestion carve-out (P8.1).
+ *
+ * Ingestion/extraction is **Python-owned** and intentionally OUT of the 1:1
+ * read-parity contract — analogous to Alembic owning migrations. The
+ * upload/extract/load endpoints (`POST /api/v1/ingest/{source}`) live in the
+ * FastAPI backend ONLY (they depend on pdfplumber/PyYAML); NestJS does NOT
+ * implement them, and they are NOT in `openapi.canonical.json`. So when we diff
+ * the Python backend's `/openapi.json` against canonical, any `/api/v1/ingest/*`
+ * path must be IGNORED — otherwise the Python-only surface would read as drift.
+ * Only the READ API is held at strict parity. See
+ * `.claude/rules/backend-parity.md`.
+ */
+export const INGEST_PATH_PREFIX = "/api/v1/ingest";
+
+/** True if a path is part of the Python-only ingestion surface (carve-out). */
+export function isIngestPath(path: string): boolean {
+  return (
+    path === INGEST_PATH_PREFIX || path.startsWith(`${INGEST_PATH_PREFIX}/`)
+  );
+}
+
+/**
  * Operations that are LIVE in both backends today and therefore must pass the
  * strict cross-backend structural parity check. Grows one entry per Stage-4
  * `BE` branch as endpoints land. Only `/health` is implemented at P2.2 time.
