@@ -8,6 +8,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { BudgetModule } from './budget/budget.module';
 import { ALL_ENTITIES } from './entities/entities';
 import { HealthModule } from './health/health.module';
+import { NetWorthModule } from './networth/networth.module';
 import { TransactionsModule } from './transactions/transactions.module';
 
 // The shared `.env` lives at the repo root (two levels up from this file:
@@ -87,6 +88,7 @@ export async function resilientDataSourceFactory(
     HealthModule,
     TransactionsModule,
     BudgetModule,
+    NetWorthModule,
   ],
 })
 export class AppModule {}

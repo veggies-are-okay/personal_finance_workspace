@@ -28,6 +28,14 @@ identically (see `.claude/rules/backend-parity.md`).
   Money decimal **string**, percentages numeric, dates `YYYY-MM-DD`. **No recompute** — a thin read
   identical to FastAPI's route (DA-9/DA-23). A `src/budget/` module (controller + query DTO + service
   reading 5 aggregate repositories) backs it.
+- `GET /api/v1/networth` (P4.3) → `200` Net Worth view composed from the `accounts` table:
+  `assets` = sum of positive balances, `liabilities` = abs of negative (signed-balance convention),
+  `net_worth` = their net; `accounts[]` sorted by name with `delta_30d` `"0.00"` and `series` empty —
+  the snapshot table holds no balance history, so neither is fabricated (keeps parity). `window`
+  accepted for parity; empty DB → zero totals + empty arrays. Money decimal **string**. **No recompute** —
+  a thin read identical to FastAPI's route (DA-9/DA-23). Totals are summed in integer cents (never a
+  float). A `src/networth/` module (controller + query DTO + service reading the `accounts` repository)
+  backs it.
 
 ## Errors (canonical envelope — parity with FastAPI)
 

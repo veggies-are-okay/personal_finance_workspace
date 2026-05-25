@@ -10,6 +10,7 @@ import {
   resilientDataSourceFactory,
 } from './app.module';
 import {
+  AccountEntity,
   ALL_ENTITIES,
   BudgetAggregateEntity,
   BudgetBucketAggregateEntity,
@@ -136,6 +137,8 @@ describe('AppModule', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue({})
       .compile();
 

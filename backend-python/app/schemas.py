@@ -215,3 +215,70 @@ class Budget(BaseModel):
     @field_serializer("savings_rate", "effective_tax_rate")
     def _serialize_pct(self, value: Decimal) -> float:
         return _percent_num(value)
+
+
+# --- Net Worth view (P4.3) -------------------------------------------------
+#
+# ``GET /api/v1/networth`` composes the ``accounts`` table into the design §3
+# shape. A thin read (DA-23 spirit): NO recompute, NO synthesized history. Both
+# backends read the SAME ``accounts`` rows, so for the same DB state FastAPI and
+# NestJS return byte-identical bodies (DA-9).
+#
+# Composition (deterministic, derived only from ``accounts.balance``):
+#   * ``assets``      = sum of POSITIVE balances;
+#   * ``liabilities`` = absolute sum of NEGATIVE balances (money-out convention);
+#   * ``net_worth``   = assets - liabilities = sum of ALL balances.
+# A null balance counts as 0.
+#
+# ``accounts[]`` lists every account (sorted by name, then id) with its balance.
+# ``delta_30d`` is ``"0.00"`` for every account: the snapshot ``accounts`` table
+# carries no balance history, so there is no 30-day change to report yet (a
+# clock-derived value would break cross-backend parity). For the same reason
+# ``series[]`` (monthly retirement/investments/cash history) is EMPTY until a
+# history source exists — neither backend fabricates it. Empty DB -> all-zero
+# totals + empty arrays. Wire conventions (Appendix A): money is a fixed-2dp
+# decimal STRING; months are ``YYYY-MM``.
+
+
+class NetWorthSeriesPoint(BaseModel):
+    """One monthly net-worth series point (``/networth.series[]``)."""
+
+    month: str  # YYYY-MM
+    retirement: Decimal
+    investments: Decimal
+    cash: Decimal
+
+    @field_serializer("retirement", "investments", "cash")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class NetWorthAccount(BaseModel):
+    """One per-account balance row (``/networth.accounts[]``)."""
+
+    name: str
+    type: str
+    balance: Decimal
+    delta_30d: Decimal
+
+    @field_serializer("balance", "delta_30d")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class NetWorth(BaseModel):
+    """The full ``GET /api/v1/networth`` response (design §3).
+
+    Totals (``net_worth``, ``assets``, ``liabilities``) are money decimal
+    strings. Empty DB -> all-zero totals and empty ``series``/``accounts``.
+    """
+
+    net_worth: Decimal
+    assets: Decimal
+    liabilities: Decimal
+    series: list[NetWorthSeriesPoint]
+    accounts: list[NetWorthAccount]
+
+    @field_serializer("net_worth", "assets", "liabilities")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
