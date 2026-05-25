@@ -26,10 +26,10 @@ Drives the **`checklist-phase-runner-parallel`** skill. Within a stage, independ
 |-------|------|--------------|
 | 1 | - [x] | 2026-05-24 (P2.1 + P2.2 merged via PR #1) |
 | 2 | - [x] | 2026-05-24 (P2.3 merged via PR #5) |
-| 3 | - [ ] | |
+| 3 | - [x] | 2026-05-24 (P3.1 via PR #6, P3.2 via PR #8 — sequential) |
 | 4 | - [ ] | |
 | 5 | - [ ] | |
 | 6 | - [ ] | |
 | 7 | - [ ] | |
 
-*Last updated: 2026-05-24 — Stage 1 complete.*
+*Last updated: 2026-05-24 — Stage 3 complete (ingestion + precompute landed; Wave 1 view endpoints next).*
