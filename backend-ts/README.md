@@ -53,6 +53,12 @@ identically (see `.claude/rules/backend-parity.md`).
   (unknown → **422**) but does not change the body. Money decimal **string**, rates numeric; empty DB →
   zeros + empty arrays; DB failure → canonical **503**. A `src/debt/` module (controller + query DTO +
   service reading the `loans` repository) backs it.
+- `GET /api/v1/goals` (P4.6) → `200` Goals view composed from the `goals` table: `target`/`saved`
+  summed (money decimal **string**), `progress_pct` the overall ratio (numeric 0–100), `funding[]`
+  one `{source,amount}` per goal (sorted by name), `affordability{}` a zero-filled block (no backing
+  table in the P2.3 schema). Empty DB → zeros + empty funding. **No recompute** — a thin read identical
+  to FastAPI's route (DA-9/DA-23). A `src/goals/` module (controller + service reading the `goals`
+  repo, with exact integer-cents summing) backs it.
 
 ## Errors (canonical envelope — parity with FastAPI)
 

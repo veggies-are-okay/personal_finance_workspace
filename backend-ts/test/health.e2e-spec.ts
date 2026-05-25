@@ -16,6 +16,7 @@ import {
   HoldingEntity,
   LoanEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 
@@ -63,6 +64,8 @@ describe('HealthController (e2e)', () => {
       .overrideProvider(getRepositoryToken(HoldingEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(LoanEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 

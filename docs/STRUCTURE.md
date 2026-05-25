@@ -27,6 +27,7 @@
 > - 2026-05-24: **`GET /api/v1/networth`** (P4.3) — the Net Worth view in **both** backends at parity, a **thin read** of the `accounts` table — **no recompute** in either backend (DA-23). Composition (deterministic, from `accounts.balance` only): `assets` = sum of positive balances, `liabilities` = abs of negative (signed-balance convention), `net_worth` = their net; `accounts[]` sorted by name with `delta_30d` `"0.00"` and `series` **empty** — the snapshot `accounts` table holds no balance history, so neither is fabricated (a clock-derived value would break parity). Python: `app/routers/networth.py` + `NetWorth`/`NetWorthAccount`/`NetWorthSeriesPoint` Pydantic models in `app/schemas.py` (money decimal-string). TS: `src/networth/` (controller + query DTO + service reading the `accounts` repo; totals summed in integer cents — never a float — `toCents`/`centsToDecimalString` helpers). `window` accepted for parity (no history to window over); a null balance counts as 0; empty DB → zero totals + empty arrays. Contracts: `test/networth.parity.test.ts` (cross-backend identity DA-9 / empty-DB zeros / DB-down 503) + `seedNetworthFixture`/`cleanupNetworthFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.3.
 > - 2026-05-24: **`GET /api/v1/investments`** (P4.4) — the Investments view in **both** backends at parity, a **thin read** of the `holdings` table — **no recompute** in either backend (DA-23). Python: `app/routers/investments.py` + `Investments`/`Allocation`/`Concentration`/`Holding` Pydantic models in `app/schemas.py` (money decimal-string, percentages numeric 0–100; `class` aliased from `class_`). TS: `src/investments/` (controller + service reading the `holdings` repo; sums money in integer **cents** for byte-identical totals, reuses `formatMoney`/`formatPercent`). `portfolio_value`/`unrealized_gain` summed; `allocation[]` grouped by asset class (`actual_pct`=market share, `target_pct`=summed per-holding weights); `concentration[]` per-holding market share ranked desc; `holdings[]` by symbol; empty DB → `"0.00"` totals + empty arrays. Contracts: `test/investments.parity.test.ts` (cross-backend identity DA-9 / empty / DB-down 503) + `seedInvestmentsFixture`/`cleanupInvestmentsFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.4.
 > - 2026-05-24: **`GET /api/v1/debt`** (P4.5) — the Debt view in **both** backends at parity, a **thin read** of the `loans` table. Python: `app/routers/debt.py` + `Debt`/`DebtTranche`/`PayoffProjection`/`LoanOut`/`LoanPriority`/`PayoffStrategy` models in `app/schemas.py`. TS: `src/debt/` (controller + query DTO + service reading the `loans` repo). Composes `total`, balance-weighted `weighted_avg_rate` (numeric 0–100), `monthly_minimum`, rate `tranches[]` (grouped by rate+priority), `loans[]`, and BOTH `payoff[]` projections — **avalanche** (highest-rate-first acceleration) and **minimums** — from a deterministic **integer-cent amortization** (`project_payoff` / `projectPayoff`) implemented identically in both backends so `debt_free_year`/`total_interest` match to the cent (DA-9). `payoff_strategy`/`loan_priority` use the shared enum registry; optional `strategy` query validates against it (unknown → 422) but does not change the body; empty DB → zeros + empty arrays + two zero projections; DB failure → canonical 503 (DA-18). Contracts: `test/debt.parity.test.ts` (cross-backend identity / avalanche-vs-minimums / strategy-422 / DB-down 503) + `seedDebtFixture`/`cleanupDebtFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.5.
+> - 2026-05-24: **`GET /api/v1/goals`** (P4.6) — the Goals view in **both** backends at parity, a **thin read** of the `goals` table — **no recompute** in either backend (DA-23). Composition (deterministic, from the `goals` rows): `target`/`saved` = sums (money decimal-string), `progress_pct` = overall ratio `saved/target*100` (numeric 0–100, DA-22), `funding[]` = one `{source,amount}` per goal sorted by name, `affordability{}` = a zero-filled block (the P2.3 schema has no affordability table; neither backend fabricates data). Python: `app/routers/goals.py` + `Goals`/`GoalFunding`/`Affordability` Pydantic models in `app/schemas.py`. TS: `src/goals/` (controller + service reading the `goals` repo; totals summed in integer cents — never a float — `toCents`/`centsToString` helpers). Empty DB → `"0.00"`/`0`/empty funding/zero affordability; DB-down → canonical 503 (DA-18). Contracts: `test/goals.parity.test.ts` (cross-backend identity DA-9 / empty-DB / DB-down 503) + `seedGoalsFixture`/`cleanupGoalsFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.6.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -64,12 +65,14 @@ personal_finance/
 │   │                          #     routers/networth.py (P4.3 GET /api/v1/networth: thin read of accounts table) ·
 │   │                          #     routers/investments.py (P4.4 GET /api/v1/investments: thin read of holdings) ·
 │   │                          #     routers/debt.py (P4.5 GET /api/v1/debt: thin read of loans + payoff projections) ·
+│   │                          #     routers/goals.py (P4.6 GET /api/v1/goals: thin read of the goals table) ·
 │   │                          #     schemas.py (HealthResponse + Transaction/Pagination/PaginatedTransactions/
 │   │                          #       TransactionQuery + Budget/BudgetBucket/BudgetCategory/MonthlyNeedsWants/
 │   │                          #       RecurringChargeOut + NetWorth/NetWorthAccount/NetWorthSeriesPoint +
 │   │                          #       Investments/Allocation/Concentration/Holding +
-│   │                          #       Debt/DebtTranche/PayoffProjection/LoanOut) ·
-│   │                          #       main.py (create_app, CORS, handlers, /health + tx + budget + networth + investments + debt)
+│   │                          #       Debt/DebtTranche/PayoffProjection/LoanOut +
+│   │                          #       Goals/GoalFunding/Affordability) ·
+│   │                          #       main.py (create_app, CORS, handlers, /health + tx + budget + networth + investments + debt + goals)
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
 │   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema · ba4cb087cce7_* = P3.2 paystubs
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
@@ -87,9 +90,10 @@ personal_finance/
 │   │                          #     networth/ (P4.3 controller + query DTO + service reading accounts repo) ·
 │   │                          #     investments/ (P4.4 controller + service reading the holdings repo, cents sum) ·
 │   │                          #     debt/ (P4.5 controller + query DTO + service reading loans repo + payoff sim) ·
+│   │                          #     goals/ (P4.6 controller + service reading the goals repo, exact integer-cents sum) ·
 │   │                          #     health/ (module · controller · service · health-response.dto.ts + *.spec.ts)
 │   ├── test/                  #   health.e2e-spec.ts · transactions.e2e-spec.ts · budget.e2e-spec.ts ·
-│   │                          #     networth.e2e-spec.ts · investments.e2e-spec.ts · debt.e2e-spec.ts (Supertest;
+│   │                          #     networth.e2e-spec.ts · investments.e2e-spec.ts · debt.e2e-spec.ts · goals.e2e-spec.ts (Supertest;
 │   │                          #     DataSource + repos overridden → boots without a DB; success/422/503 cases)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
@@ -104,7 +108,7 @@ personal_finance/
 │   │                          #     (Vitest globalSetup) · normalize.ts (OpenAPI structural normalizer) ·
 │   │                          #     contract.ts (canonical loader + IMPLEMENTED_PATHS allowlist) ·
 │   │                          #     schema.ts (schema-parity check, DA-8) · db.ts (synthetic seeds for
-│   │                          #     value-parity: transactions P4.1 + budget P4.2 + networth P4.3 + investments P4.4 + debt P4.5) · http.ts
+│   │                          #     value-parity: transactions P4.1 + budget P4.2 + networth P4.3 + investments P4.4 + debt P4.5 + goals P4.6) · http.ts
 │   ├── test/                  #   health-response.parity · openapi.parity (structural diff, scoped to
 │   │                          #     implemented paths) · schema.parity (Alembic head ↔ TypeORM entities) ·
 │   │                          #     transactions.parity (P4.1: success/422/offset/503) ·
@@ -112,6 +116,7 @@ personal_finance/
 │   │                          #     networth.parity (P4.3: cross-backend identity DA-9 / empty-DB zeros / 503) ·
 │   │                          #     investments.parity (P4.4: cross-backend identity DA-9 / empty / 503) ·
 │   │                          #     debt.parity (P4.5: identity / avalanche-vs-minimums / 422 / 503) ·
+│   │                          #     goals.parity (P4.6: cross-backend identity DA-9 / empty / 503) ·
 │   │                          #     endpoints.parity.stubs (it.todo per endpoint) ·
 │   │                          #     normalize.unit · contract.unit · backends.unit · schema.unit
 │   ├── package.json           #   scripts: `test:parity` (canonical gate; pretest builds both backends) ·

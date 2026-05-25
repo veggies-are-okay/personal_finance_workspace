@@ -8,6 +8,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { BudgetModule } from './budget/budget.module';
 import { DebtModule } from './debt/debt.module';
 import { ALL_ENTITIES } from './entities/entities';
+import { GoalsModule } from './goals/goals.module';
 import { HealthModule } from './health/health.module';
 import { InvestmentsModule } from './investments/investments.module';
 import { NetWorthModule } from './networth/networth.module';
@@ -93,6 +94,7 @@ export async function resilientDataSourceFactory(
     NetWorthModule,
     InvestmentsModule,
     DebtModule,
+    GoalsModule,
   ],
 })
 export class AppModule {}
