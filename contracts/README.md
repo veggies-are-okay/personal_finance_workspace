@@ -40,6 +40,19 @@ Port **8000** on this machine is held by an **unrelated** process that returns
 and the health poll **fails loudly** if it ever sees `{"status":"healthy"}` (or any
 body other than `{"status":"ok"}`), so a misconfigured port can't silently pass.
 
+### Running several parity suites in parallel
+
+The four harness ports are env-overridable so independent runs (e.g. parallel
+checklist subagents, each in its own worktree against its own Postgres database
+via `DATABASE_URL`) don't collide. Unset → the defaults above (CI is unchanged):
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `PARITY_PY_PORT` | `8765` | FastAPI port |
+| `PARITY_TS_PORT` | `3765` | NestJS port |
+| `PARITY_PY_DOWN_PORT` | `8766` | FastAPI DB-down pair (DA-18) |
+| `PARITY_TS_DOWN_PORT` | `3766` | NestJS DB-down pair (DA-18) |
+
 ## What the tests check
 
 - **`test/health-response.parity.test.ts`** — Response parity. `GET /health` on both

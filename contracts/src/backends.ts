@@ -18,16 +18,29 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // contracts/src -> repo root is two levels up.
 const REPO_ROOT = resolve(HERE, "..", "..");
 
+/** Read a positive-integer port from `name`, else fall back to `fallback`.
+ *
+ * Lets several parity runs execute **in parallel** on distinct ports (e.g.
+ * parallel checklist subagents, each in its own worktree): set
+ * `PARITY_PY_PORT` / `PARITY_TS_PORT` / `PARITY_PY_DOWN_PORT` /
+ * `PARITY_TS_DOWN_PORT`. Unset → the original dedicated defaults, so existing
+ * single-run behavior (and CI) is unchanged. */
+function envPort(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /** Dedicated free ports — intentionally NOT 8000 (rogue process lives there). */
-export const PY_PORT = 8765;
-export const TS_PORT = 3765;
+export const PY_PORT = envPort("PARITY_PY_PORT", 8765);
+export const TS_PORT = envPort("PARITY_TS_PORT", 3765);
 
 export const PY_BASE = `http://127.0.0.1:${PY_PORT}`;
 export const TS_BASE = `http://127.0.0.1:${TS_PORT}`;
 
 /** Separate ports for the short-lived DB-DOWN backend pair (DA-18 parity). */
-export const PY_DOWN_PORT = 8766;
-export const TS_DOWN_PORT = 3766;
+export const PY_DOWN_PORT = envPort("PARITY_PY_DOWN_PORT", 8766);
+export const TS_DOWN_PORT = envPort("PARITY_TS_DOWN_PORT", 3766);
 
 export const PY_DOWN_BASE = `http://127.0.0.1:${PY_DOWN_PORT}`;
 export const TS_DOWN_BASE = `http://127.0.0.1:${TS_DOWN_PORT}`;
