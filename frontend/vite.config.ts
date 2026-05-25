@@ -21,6 +21,8 @@ export default defineConfig({
         'src/main.tsx',
         'src/vite-env.d.ts',
         'src/test/**',
+        // Dev-only MSW browser worker entry (started from main.tsx, not unit-tested).
+        'src/mocks/browser.ts',
         '**/*.d.ts',
         '**/*.config.*',
       ],
