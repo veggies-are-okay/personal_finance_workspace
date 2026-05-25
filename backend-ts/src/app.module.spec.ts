@@ -20,6 +20,8 @@ import {
   LoanEntity,
   RecurringChargeEntity,
   GoalEntity,
+  PlaidItemEntity,
+  SourceConfigEntity,
   TransactionEntity,
 } from './entities/entities';
 import { HealthController } from './health/health.controller';
@@ -148,6 +150,10 @@ describe('AppModule', () => {
       .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PlaidItemEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(SourceConfigEntity))
       .useValue({})
       .compile();
 

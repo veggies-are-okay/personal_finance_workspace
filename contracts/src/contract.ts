@@ -56,16 +56,17 @@ export const IMPLEMENTED_PATHS: ReadonlySet<OperationKey> =
     opKey("GET", "/api/v1/investments"), // P4.4
     opKey("GET", "/api/v1/debt"), // P4.5
     opKey("GET", "/api/v1/goals"), // P4.6
+    // P6.1 connections API (link/exchange/list + JWT-verified webhook):
+    opKey("POST", "/api/v1/connections/link-token"),
+    opKey("POST", "/api/v1/connections/exchange"),
+    opKey("GET", "/api/v1/connections"),
+    opKey("POST", "/api/v1/connections/webhook"),
     // Stage-4 branches append as they implement (DA-25 keeps the OpenAPI frozen):
     // opKey("GET", "/api/v1/sources/transactions"),
     // opKey("GET", "/api/v1/sources/income"),
     // opKey("GET", "/api/v1/sources/holdings"),
     // opKey("GET", "/api/v1/sources/loans"),
     // opKey("GET", "/api/v1/sources/listings"),
-    // opKey("POST", "/api/v1/connections/link-token"),
-    // opKey("POST", "/api/v1/connections/exchange"),
-    // opKey("GET", "/api/v1/connections"),
-    // opKey("POST", "/api/v1/connections/webhook"),
   ]);
 
 /** Every "<METHOD> <path>" operation declared in the canonical contract. */

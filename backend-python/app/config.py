@@ -33,6 +33,20 @@ class Settings(BaseSettings):
     app_name: str = "personal-finance-api"
     database_url: str = "postgresql://pf:pf@localhost:5432/personal_finance"
 
+    # --- Plaid / connections (P6.1). Secrets come from the gitignored repo-root
+    # `.env`; defaults keep the app bootable without them (CI mocks Plaid). The
+    # single-user app keys every Item to one fixed user id. ---------------------
+    plaid_client_id: str = ""
+    plaid_secret: str = ""
+    plaid_env: str = "sandbox"
+    # base64 of 32 random bytes -> the AES-256-GCM key for token-at-rest (DA-12).
+    app_encryption_key: str = ""
+    plaid_user_id: str = "local"
+    # Webhook URL Plaid calls back; only used to populate link/sandbox requests.
+    plaid_webhook_url: str = "http://localhost:8000/api/v1/connections/webhook"
+    # OAuth redirect allowlist (NO open redirect, DA): comma-separated exact URIs.
+    oauth_redirect_allowlist: str = "http://localhost:5173/oauth,http://127.0.0.1:5173/oauth"
+
 
 @lru_cache
 def get_settings() -> Settings:

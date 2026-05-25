@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # Canonical HTTP statuses (literals avoid the starlette constant deprecation churn).
+HTTP_401_UNAUTHORIZED = 401
 HTTP_422_VALIDATION = 422
 HTTP_503_UNAVAILABLE = 503
 
@@ -71,6 +72,20 @@ class ServiceUnavailableError(Exception):
     """
 
     def __init__(self, message: str = "Database unavailable.") -> None:
+        super().__init__(message)
+        self.message = message
+
+
+class UnauthorizedError(Exception):
+    """Raised when authentication/verification fails (-> 401, P6.1 webhook).
+
+    The Plaid webhook handler raises this for any unverified/forged/unsigned
+    request so the canonical 401 body is produced in one place, identical to the
+    NestJS filter's 401 branch. The message is intentionally generic (never
+    leaks why verification failed).
+    """
+
+    def __init__(self, message: str = "Webhook signature verification failed.") -> None:
         super().__init__(message)
         self.message = message
 
@@ -138,7 +153,16 @@ async def service_unavailable_handler(
     )
 
 
+async def unauthorized_handler(_request: Request, exc: UnauthorizedError) -> JSONResponse:
+    """Emit the canonical 401 body for failed webhook verification (P6.1)."""
+    return JSONResponse(
+        status_code=HTTP_401_UNAUTHORIZED,
+        content=_envelope(CODE_UNAUTHORIZED, exc.message, []),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Wire the canonical handlers onto the app (called by ``create_app``)."""
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(ServiceUnavailableError, service_unavailable_handler)
+    app.add_exception_handler(UnauthorizedError, unauthorized_handler)

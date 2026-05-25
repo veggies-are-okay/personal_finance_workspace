@@ -11,6 +11,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -53,6 +54,15 @@ export const UNREACHABLE_DATABASE_URL =
 /** The one and only acceptable health body. Anything else fails loudly. */
 export const EXPECTED_HEALTH_BODY = { status: "ok" } as const;
 
+/**
+ * A SYNTHETIC base64 AES-256 key (32 bytes) forced on BOTH backends for the
+ * parity run so the cross-backend token-decrypt test (DA-12) holds the key both
+ * backends encrypt with. NOT a real APP_ENCRYPTION_KEY — test material only.
+ */
+export const PARITY_ENCRYPTION_KEY = Buffer.from(
+  "0123456789abcdef0123456789abcdef",
+).toString("base64");
+
 export interface BackendHandle {
   name: string;
   base: string;
@@ -63,17 +73,36 @@ function backendDir(...parts: string[]): string {
   return resolve(REPO_ROOT, ...parts);
 }
 
+/** Directory the captured backend logs are streamed to (DA-14 log-scrub test). */
+export const PARITY_LOG_DIR = resolve(REPO_ROOT, "contracts", ".parity-logs");
+export const PY_LOG_FILE = resolve(PARITY_LOG_DIR, "python.log");
+export const TS_LOG_FILE = resolve(PARITY_LOG_DIR, "nest.log");
+
+/**
+ * Stream a piped child's stdout+stderr to `logFile` (truncated first) so a test
+ * worker — a SEPARATE process from this setup — can read the captured logs and
+ * assert no token string ever reaches a log line (DA-14).
+ */
+function attachCapture(proc: ChildProcess, logFile: string): void {
+  mkdirSync(PARITY_LOG_DIR, { recursive: true });
+  writeFileSync(logFile, "");
+  const append = (d: Buffer): void => appendFileSync(logFile, d.toString());
+  proc.stdout?.on("data", append);
+  proc.stderr?.on("data", append);
+}
+
 /** Spawn FastAPI via uvicorn on the given port (cwd = backend-python/). */
 export function spawnPython(
   port: number = PY_PORT,
   extraEnv: NodeJS.ProcessEnv = {},
+  capture = false,
 ): ChildProcess {
   return spawn(
     "uv",
     ["run", "uvicorn", "app.main:app", "--port", String(port)],
     {
       cwd: backendDir("backend-python"),
-      stdio: "ignore",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "ignore",
       // Own process group so we can kill the whole tree (uv -> uvicorn).
       detached: true,
       env: { ...process.env, ...extraEnv },
@@ -85,10 +114,11 @@ export function spawnPython(
 export function spawnNest(
   port: number = TS_PORT,
   extraEnv: NodeJS.ProcessEnv = {},
+  capture = false,
 ): ChildProcess {
   return spawn("node", ["dist/main.js"], {
     cwd: backendDir("backend-ts"),
-    stdio: "ignore",
+    stdio: capture ? ["ignore", "pipe", "pipe"] : "ignore",
     detached: true,
     env: { ...process.env, TS_API_PORT: String(port), ...extraEnv },
   });
@@ -169,15 +199,29 @@ export async function startBackends(): Promise<{
   python: BackendHandle;
   nest: BackendHandle;
 }> {
+  // PLAID_FAKE=1 makes both backends use the network-free fake Plaid gateway
+  // (P6.1) so the parity run is hermetic — no real Plaid call. A SYNTHETIC
+  // APP_ENCRYPTION_KEY is forced for the run so the cross-backend token-decrypt
+  // parity test holds the same key both backends encrypt with (DA-12).
+  const plaidEnv = {
+    PLAID_FAKE: "1",
+    APP_ENCRYPTION_KEY: PARITY_ENCRYPTION_KEY,
+  };
+  // Capture stdout+stderr for the main pair so the DA-14 log-scrub parity test
+  // can assert no token string ever reaches a log line.
+  const pyProc = spawnPython(PY_PORT, plaidEnv, true);
+  const nestProc = spawnNest(TS_PORT, plaidEnv, true);
+  attachCapture(pyProc, PY_LOG_FILE);
+  attachCapture(nestProc, TS_LOG_FILE);
   const python: BackendHandle = {
     name: "backend-python (FastAPI)",
     base: PY_BASE,
-    proc: spawnPython(),
+    proc: pyProc,
   };
   const nest: BackendHandle = {
     name: "backend-ts (NestJS)",
     base: TS_BASE,
-    proc: spawnNest(),
+    proc: nestProc,
   };
 
   try {

@@ -17,6 +17,8 @@ import {
   LoanEntity,
   RecurringChargeEntity,
   GoalEntity,
+  PlaidItemEntity,
+  SourceConfigEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 
@@ -66,6 +68,10 @@ describe('HealthController (e2e)', () => {
       .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PlaidItemEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(SourceConfigEntity))
       .useValue({})
       .compile();
 

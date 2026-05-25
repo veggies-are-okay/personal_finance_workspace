@@ -17,7 +17,10 @@ import { canonicalValidationExceptionFactory } from './errors/validation-excepti
  * - Listens on `TS_API_PORT` (default 3000).
  */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` preserves the unparsed request body so the Plaid webhook can
+  // hash it for JWT body-integrity verification (DA-11). The parsed JSON body is
+  // still available for the other routes.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Canonical error envelope for EVERY error (DA-1/DA-18): the filter renders
   // the one shared shape, and the ValidationPipe is forced to HTTP 422 with that

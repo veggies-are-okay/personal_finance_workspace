@@ -12,10 +12,63 @@
  * before the parity job runs.
  */
 
+import { createDecipheriv } from "node:crypto";
+
 import { Client } from "pg";
 
 const DEFAULT_DATABASE_URL =
   "postgresql://pf:pf@localhost:5432/personal_finance";
+
+// --- Connections fixture (P6.1) -------------------------------------------
+//
+// The connections lifecycle writes the `plaid_items` table; the parity test
+// drives /exchange on each booted backend (with PLAID_FAKE=1) and then reads the
+// stored row to prove the access_token is encrypted at rest (no plaintext) and
+// cross-backend decryptable (DA-12). These helpers read/clean that row.
+
+/** The fixed synthetic item_id the fake gateway returns (both backends). */
+export const FAKE_ITEM_ID = "item-fake-0001";
+
+/** Read the raw `access_token` BYTEA bytes for an item, or null if absent. */
+export async function readPlaidItemToken(
+  itemId: string,
+): Promise<Buffer | null> {
+  return withClient(async (client) => {
+    const res = await client.query<{ access_token: Buffer }>(
+      "SELECT access_token FROM plaid_items WHERE item_id = $1",
+      [itemId],
+    );
+    return res.rows.length > 0 ? res.rows[0].access_token : null;
+  });
+}
+
+/** Remove any plaid_items rows this fixture owns (idempotent). */
+export async function cleanupConnectionsFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM plaid_items WHERE item_id = $1", [
+      FAKE_ITEM_ID,
+    ]);
+  });
+}
+
+/**
+ * Decrypt a `nonce(12)||ciphertext||tag(16)` blob with `node:crypto`
+ * (AES-256-GCM) — the exact format backend-ts writes and backend-python reads.
+ * Proving this decrypts a blob WRITTEN BY THE PYTHON backend establishes the
+ * cross-backend interchangeability invariant (DA-12) from the TS side.
+ */
+export function decryptTokenNode(blob: Buffer, base64Key: string): string {
+  const key = Buffer.from(base64Key, "base64");
+  const nonce = blob.subarray(0, 12);
+  const tag = blob.subarray(blob.length - 16);
+  const ciphertext = blob.subarray(12, blob.length - 16);
+  const decipher = createDecipheriv("aes-256-gcm", key, nonce);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
+}
 
 /** A synthetic transaction row mirrored across both backends. */
 export interface SeedTransaction {
@@ -268,38 +321,38 @@ export async function cleanupNetworthFixture(): Promise<void> {
 // registry, keyed by a unique name prefix so cleanup never touches other data.
 // Rows are inserted out of rate order to prove both backends sort identically.
 
-const DEBT_NAME_PREFIX = 'ParityP45 ';
+const DEBT_NAME_PREFIX = "ParityP45 ";
 
 /** The fixed synthetic loans both backends serve in the debt parity test. */
 export const SEED_LOANS = [
   // out of rate order on purpose -> both backends must emit rate desc.
   {
     name: `${DEBT_NAME_PREFIX}Loan B`,
-    balance: '8000.00',
-    rate: '4.5',
-    minimumPayment: '100.00',
-    priority: 'then',
+    balance: "8000.00",
+    rate: "4.5",
+    minimumPayment: "100.00",
+    priority: "then",
   },
   {
     name: `${DEBT_NAME_PREFIX}Loan A`,
-    balance: '12000.00',
-    rate: '6.8',
-    minimumPayment: '150.00',
-    priority: 'pay_first',
+    balance: "12000.00",
+    rate: "6.8",
+    minimumPayment: "150.00",
+    priority: "pay_first",
   },
   {
     name: `${DEBT_NAME_PREFIX}Loan C`,
-    balance: '6560.00',
-    rate: '3.2',
-    minimumPayment: '70.00',
-    priority: 'minimums',
+    balance: "6560.00",
+    rate: "3.2",
+    minimumPayment: "70.00",
+    priority: "minimums",
   },
 ];
 
 /** Remove any rows this fixture owns (idempotent; safe to call before+after). */
 export async function cleanupDebtFixture(): Promise<void> {
   await withClient(async (client) => {
-    await client.query('DELETE FROM loans WHERE name LIKE $1', [
+    await client.query("DELETE FROM loans WHERE name LIKE $1", [
       `${DEBT_NAME_PREFIX}%`,
     ]);
   });
@@ -396,7 +449,12 @@ export interface SeedGoal {
 /** The fixed synthetic goals both backends serve in the goals parity test. */
 export const SEED_GOALS: SeedGoal[] = [
   // Out of name order (Vacation before Emergency Fund) -> both must sort by name.
-  { id: 980002, name: "ParityP46 Vacation", target: "10000.00", saved: "6000.00" },
+  {
+    id: 980002,
+    name: "ParityP46 Vacation",
+    target: "10000.00",
+    saved: "6000.00",
+  },
   {
     id: 980001,
     name: "ParityP46 Emergency Fund",

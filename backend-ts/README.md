@@ -60,6 +60,26 @@ identically (see `.claude/rules/backend-parity.md`).
   to FastAPI's route (DA-9/DA-23). A `src/goals/` module (controller + service reading the `goals`
   repo, with exact integer-cents summing) backs it.
 
+### Connections API (P6.1)
+
+A `src/connections/` module — the parity twin of `backend-python/app/connections/` — backs four routes:
+
+- `POST /api/v1/connections/link-token` → `200` `{link_token, expiration}` (expiration ISO-8601 `…Z`).
+- `POST /api/v1/connections/exchange` → `200` `{item_id, status}`. Exchanges the Plaid `public_token`,
+  **encrypts** the `access_token` (AES-256-GCM) and stores it in `plaid_items` — the token is **never**
+  returned. `crypto.ts` uses the on-disk layout `nonce(12)‖ciphertext‖tag(16)`, **byte-compatible with
+  the Python backend** so a token written by either decrypts in the other (DA-12; proven in `contracts/`).
+- `GET /api/v1/connections` → `200` `{items, sources}` — linked Items + per-source `{source, mode, status}`.
+- `POST /api/v1/connections/webhook` → `200` `{status:"accepted"}`. The `Plaid-Verification` ES256 JWT is
+  verified against the Plaid JWKS (`/webhook_verification_key/get`, cached), with `iat` freshness, a raw-body
+  SHA-256 match, and a rate limit; unverified/forged/unsigned → canonical **401** (DA-11).
+- An OAuth redirect (`GET /api/v1/connections/oauth`, excluded from OpenAPI) enforces a strict redirect-URI
+  **allowlist** — no open redirect.
+
+The Plaid client is injected behind the `PLAID_GATEWAY` token; `PLAID_FAKE=1` (CI/parity) selects the
+network-free `FakePlaidGateway`. `redaction.ts` scrubs `access/public/link` tokens from all logs (DA-14).
+Reads `PLAID_CLIENT_ID`/`PLAID_SECRET`/`PLAID_ENV`/`APP_ENCRYPTION_KEY` from the repo-root `.env` via `@nestjs/config`.
+
 ## Errors (canonical envelope — parity with FastAPI)
 
 - `src/errors/` — the canonical `{"error":{code,message,details[]}}` envelope (DA-1). The global
