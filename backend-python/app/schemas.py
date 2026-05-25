@@ -113,3 +113,105 @@ class TransactionQuery(BaseModel):
     account: str | None = None
     category: str | None = None
     q: str | None = None
+
+
+# --- Budget view (P4.2) ----------------------------------------------------
+#
+# ``GET /api/v1/budget`` composes the precomputed aggregate tables
+# (``budget_aggregates`` + the bucket/category/monthly child tables +
+# ``recurring_charges``) into the design §3 shape. No recompute happens here —
+# both backends serve thin reads of those tables (DA-23).
+#
+# Wire conventions (Appendix A): money is a fixed-2dp decimal STRING; percentages
+# are JSON NUMBERS on a 0-100 scale (one decimal by convention, DA-22); dates are
+# ``YYYY-MM-DD``; months are ``YYYY-MM``.
+
+
+def _money_str(value: Decimal) -> str:
+    """Render money as a fixed-2dp decimal string (Appendix A / DA-2)."""
+    return f"{value:.2f}"
+
+
+def _percent_num(value: Decimal) -> float:
+    """Render a percentage as a JSON number, 0-100, one decimal (DA-22).
+
+    The DB stores the column as ``NUMERIC`` (a ``Decimal`` 0-100). We quantize to
+    one decimal place and emit a float so the wire form is a JSON number that
+    matches the NestJS ``Number(value.toFixed(1))`` exactly.
+    """
+    return float(value.quantize(Decimal("0.1")))
+
+
+class BudgetBucket(BaseModel):
+    """One 50/30/20 bucket row (``/budget.buckets[]``)."""
+
+    name: Bucket
+    target_pct: Decimal
+    actual_pct: Decimal
+    amount: Decimal
+
+    @field_serializer("target_pct", "actual_pct")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+    @field_serializer("amount")
+    def _serialize_amount(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class BudgetCategory(BaseModel):
+    """One category breakdown row (``/budget.categories[]``)."""
+
+    name: str
+    amount: Decimal
+    bucket: Bucket
+
+    @field_serializer("amount")
+    def _serialize_amount(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class MonthlyNeedsWants(BaseModel):
+    """One month of needs/wants totals (``/budget.monthly[]``)."""
+
+    month: str  # YYYY-MM
+    needs: Decimal
+    wants: Decimal
+
+    @field_serializer("needs", "wants")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class RecurringChargeOut(BaseModel):
+    """One detected recurring charge (``/budget.recurring[]``)."""
+
+    merchant: str
+    category: str
+    cadence: str
+    last_charged: date_cls
+    monthly_est: Decimal
+
+    @field_serializer("monthly_est")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class Budget(BaseModel):
+    """The full ``GET /api/v1/budget`` response (design §3).
+
+    Scalars (``savings_rate``, ``effective_tax_rate``) are numeric percentages;
+    the arrays compose the precomputed child tables. Empty DB -> well-formed
+    zeros (rates ``0``) and empty arrays.
+    """
+
+    savings_rate: Decimal
+    effective_tax_rate: Decimal
+    buckets: list[BudgetBucket]
+    categories: list[BudgetCategory]
+    monthly: list[MonthlyNeedsWants]
+    recurring: list[RecurringChargeOut]
+
+    @field_serializer("savings_rate", "effective_tax_rate")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)

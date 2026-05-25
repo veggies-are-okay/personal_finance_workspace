@@ -7,7 +7,14 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
-import { TransactionEntity } from '../src/entities/entities';
+import {
+  BudgetAggregateEntity,
+  BudgetBucketAggregateEntity,
+  BudgetCategoryAggregateEntity,
+  BudgetMonthlyAggregateEntity,
+  RecurringChargeEntity,
+  TransactionEntity,
+} from '../src/entities/entities';
 import { CanonicalExceptionFilter } from '../src/errors/canonical-exception.filter';
 import { canonicalValidationExceptionFactory } from '../src/errors/validation-exception.factory';
 
@@ -80,6 +87,17 @@ describe('TransactionsController (e2e)', () => {
       .useValue(fakeDataSource)
       .overrideProvider(getRepositoryToken(TransactionEntity))
       .useValue(repo)
+      // Budget feature repos must resolve for AppModule to compile DB-free.
+      .overrideProvider(getRepositoryToken(BudgetAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetBucketAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetCategoryAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();

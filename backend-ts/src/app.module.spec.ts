@@ -9,7 +9,15 @@ import {
   DEFAULT_DATABASE_URL,
   resilientDataSourceFactory,
 } from './app.module';
-import { ALL_ENTITIES, TransactionEntity } from './entities/entities';
+import {
+  ALL_ENTITIES,
+  BudgetAggregateEntity,
+  BudgetBucketAggregateEntity,
+  BudgetCategoryAggregateEntity,
+  BudgetMonthlyAggregateEntity,
+  RecurringChargeEntity,
+  TransactionEntity,
+} from './entities/entities';
 import { HealthController } from './health/health.controller';
 
 /**
@@ -115,9 +123,19 @@ describe('AppModule', () => {
     })
       .overrideProvider(getDataSourceToken())
       .useValue(fakeDataSource)
-      // The TransactionsModule's forFeature repo provider needs the DataSource's
-      // entity metadata; override it so the module boots without a live DB.
+      // The feature modules' forFeature repo providers need the DataSource's
+      // entity metadata; override them so the module boots without a live DB.
       .overrideProvider(getRepositoryToken(TransactionEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetBucketAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetCategoryAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecurringChargeEntity))
       .useValue({})
       .compile();
 

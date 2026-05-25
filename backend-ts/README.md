@@ -21,6 +21,13 @@ identically (see `.claude/rules/backend-parity.md`).
   `limit` 1–200 (default 50), `offset` ≥ 0. Money is a decimal **string**, dates `YYYY-MM-DD`,
   absent optional fields omitted. Identical to FastAPI's route. A `src/transactions/` module
   (controller + query DTO + service via TypeORM) backs it.
+- `GET /api/v1/budget` (P4.2) → `200` Budget view composed from the **precomputed** aggregate
+  tables (`budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`):
+  `savings_rate`/`effective_tax_rate` (numeric 0–100), 50/30/20 `buckets`, `categories`, `monthly`
+  needs/wants, `recurring`. `window` selector (default `12m`); empty DB → zeros + empty arrays.
+  Money decimal **string**, percentages numeric, dates `YYYY-MM-DD`. **No recompute** — a thin read
+  identical to FastAPI's route (DA-9/DA-23). A `src/budget/` module (controller + query DTO + service
+  reading 5 aggregate repositories) backs it.
 
 ## Errors (canonical envelope — parity with FastAPI)
 
