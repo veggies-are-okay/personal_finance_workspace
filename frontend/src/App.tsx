@@ -6,6 +6,7 @@ import { DebtScreen } from './features/debt/DebtScreen';
 import { GoalsScreen } from './features/goals/GoalsScreen';
 import { InvestmentsScreen } from './features/investments/InvestmentsScreen';
 import { NetWorthScreen } from './features/networth/NetWorthScreen';
+import { SettingsScreen } from './features/connections/SettingsScreen';
 import { StoryScreen } from './features/story/StoryScreen';
 
 function NotFound() {
@@ -38,6 +39,7 @@ export function AppRoutes() {
         <Route path="investments" element={<InvestmentsScreen />} />
         <Route path="debt" element={<DebtScreen />} />
         <Route path="goals" element={<GoalsScreen />} />
+        <Route path="settings" element={<SettingsScreen />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

@@ -12,11 +12,18 @@
 import type {
   ApiError,
   Budget,
+  ConnectionsList,
   Debt,
+  ExchangeRequest,
+  ExchangeResponse,
   Goals,
   Investments,
+  LinkTokenCreateRequest,
+  LinkTokenResponse,
   NetWorth,
   PaginatedTransactions,
+  Source,
+  SourceMode,
 } from './types';
 
 /** Default base URL when `VITE_API_BASE_URL` is not set. */
@@ -49,6 +56,10 @@ export class ApiRequestError extends Error {
 }
 
 const JSON_HEADERS = { Accept: 'application/json' } as const;
+const JSON_BODY_HEADERS = {
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+} as const;
 
 /** Build `${base}${path}` with an optional query string. */
 function buildUrl(path: string, query?: Record<string, string | undefined>): string {
@@ -85,6 +96,34 @@ async function getJson<T>(
     const message =
       body?.error?.message ?? `Request to ${path} failed (HTTP ${response.status}).`;
     throw new ApiRequestError(response.status, message, body);
+  }
+
+  return (await response.json()) as T;
+}
+
+/**
+ * POST `path` with a JSON `body` and parse the JSON response as `T`.
+ *
+ * @throws {ApiRequestError} when the response is not OK (non-2xx). The canonical
+ *   error envelope is attached as `.body` when the backend returned one.
+ */
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: JSON_BODY_HEADERS,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let error: ApiError | undefined;
+    try {
+      error = (await response.json()) as ApiError;
+    } catch {
+      error = undefined;
+    }
+    const message =
+      error?.error?.message ?? `Request to ${path} failed (HTTP ${response.status}).`;
+    throw new ApiRequestError(response.status, message, error);
   }
 
   return (await response.json()) as T;
@@ -145,4 +184,41 @@ export function getDebt(strategy?: string): Promise<Debt> {
 /** GET `/api/v1/goals`. */
 export function getGoals(): Promise<Goals> {
   return getJson<Goals>('/api/v1/goals');
+}
+
+// --- Connections (Plaid Link lifecycle + Settings) ---------------------------
+// These three endpoints are P6.1 on the backend; until then the frontend drives
+// them against the MSW mock derived from the canonical spec (DA-21).
+
+/** GET `/api/v1/connections` — per-source mode/status, drives the Settings screen. */
+export function getConnections(): Promise<ConnectionsList> {
+  return getJson<ConnectionsList>('/api/v1/connections');
+}
+
+/** POST `/api/v1/connections/link-token` — create a short-lived Plaid Link token. */
+export function createLinkToken(
+  body: LinkTokenCreateRequest = {},
+): Promise<LinkTokenResponse> {
+  return postJson<LinkTokenResponse>('/api/v1/connections/link-token', body);
+}
+
+/** POST `/api/v1/connections/exchange` — swap a Plaid `public_token` for an Item. */
+export function exchangePublicToken(public_token: string): Promise<ExchangeResponse> {
+  const body: ExchangeRequest = { public_token };
+  return postJson<ExchangeResponse>('/api/v1/connections/exchange', body);
+}
+
+/**
+ * Switch a single source between `local` and `api` mode.
+ *
+ * NOTE: the canonical contract has no mode-mutation endpoint yet — wiring the
+ * adapter swap end-to-end is P6.4 (`BE`). For now this is a FRONTEND-ONLY call
+ * against the MSW mock at a connections-namespaced path so the Settings toggle
+ * is exercisable; it is intentionally NOT in `contracts/openapi.canonical.json`.
+ */
+export function setSourceMode(
+  source: Source,
+  mode: SourceMode,
+): Promise<ConnectionsList> {
+  return postJson<ConnectionsList>('/api/v1/connections/source-mode', { source, mode });
 }

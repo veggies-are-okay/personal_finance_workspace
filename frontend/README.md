@@ -35,6 +35,29 @@ Mock scenario control (mock only): append `?scenario=empty` (DA-20 not-connected
 empty state) or `?scenario=error` (canonical 503) to any in-app fetch URL via the
 handlers — used by the tests to drive each state.
 
+### Settings / Data Sources + Plaid Link (P5.2)
+
+The **Settings** screen (`/settings`, `src/features/connections/`) reads
+`GET /api/v1/connections` and lists each source with its **Local↔API mode** and
+`item_status`, rendering all four states (`connected` / `needs_reauth` / `error`
+/ `not_connected`) with the right affordance — `needs_reauth`/`error` get a
+**Reconnect** CTA (Plaid update mode), `not_connected` gets **Connect**.
+
+- **Plaid is mocked in dev & tests.** `usePlaidConnect` is the *only* coupling to
+  `react-plaid-link`; it runs link-token → open Link → exchange. In tests
+  `usePlaidLink` is `vi.mock`-ed so **no real Plaid Link opens and no credentials
+  are needed** (DATA PRIVACY). In dev the connections endpoints are served by the
+  MSW mock (the backend connections endpoints are **P6.1**, not built yet).
+- **The Local↔API toggle** (`ModeToggle`) POSTs to `/api/v1/connections/source-mode`
+  — a **mock-only, frontend-side placeholder** (intentionally NOT in the canonical
+  OpenAPI). Wiring the adapter swap end-to-end is **P6.4 (`BE`)**; until then the
+  toggle just exercises the UI against the mock.
+- **Pointing at a real backend later:** once P6.1 ships the real connections
+  endpoints, set `VITE_API_BASE_URL` to the backend and the same `src/lib/api.ts`
+  calls hit it (mock off). To open the *real* Plaid Link, provide a real
+  `link_token` from the backend (Sandbox in CI; Trial locally) — no code change in
+  the connections module is required.
+
 ## Key files
 
 | Path | Role |
@@ -46,7 +69,7 @@ handlers — used by the tests to drive each state.
 | `src/lib/theme.tsx` · `themeContext.ts` | Light/dark theme provider + `useTheme` hook (class strategy). |
 | `src/mocks/` | MSW handlers + synthetic fixtures (derived from the contract) + browser/Node setup. |
 | `src/components/` | Shared UI: `AppLayout`, `Sidebar`, `ScreenState`, `StatCard`, `MeterRow`, `BarChart`, `DataTable`, `Card`, `Badge`, `InsightCallout`, `PageHeader`. |
-| `src/features/` | One module per screen: `story`, `budget`, `networth`, `investments`, `debt`, `goals` (`connections` is P5.2). |
+| `src/features/` | One module per screen: `story`, `budget`, `networth`, `investments`, `debt`, `goals`, `connections` (Settings + the isolated Plaid Link flow). |
 | `src/test/setup.ts` | jest-dom + RTL cleanup; boots the MSW Node server + localStorage/matchMedia polyfills. |
 | `vite.config.ts` | Vite + Tailwind v4 plugin + Vitest (jsdom, v8 coverage). |
 | `public/mockServiceWorker.js` | MSW service worker (vendored by `msw init`; required for the dev mock). |

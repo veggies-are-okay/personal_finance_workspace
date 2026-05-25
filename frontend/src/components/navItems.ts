@@ -7,3 +7,10 @@ export const NAV_ITEMS = [
   { to: '/debt', label: 'Debt', icon: '▤' },
   { to: '/goals', label: 'Goals', icon: '◎' },
 ] as const;
+
+/** Settings / Data Sources — lives in the sidebar footer, below the divider. */
+export const SETTINGS_NAV_ITEM = {
+  to: '/settings',
+  label: 'Data sources',
+  icon: '⚙',
+} as const;

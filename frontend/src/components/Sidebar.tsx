@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '../lib/themeContext';
-import { NAV_ITEMS } from './navItems';
+import { NAV_ITEMS, SETTINGS_NAV_ITEM } from './navItems';
 
 const baseLink =
   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600';
@@ -49,17 +49,18 @@ export function Sidebar() {
       </ul>
 
       <div className="mt-4 flex flex-col gap-1 border-t border-slate-200 pt-4 dark:border-slate-800">
-        {/* Settings / Data Sources is built in P5.2 — placeholder slot for now. */}
-        <span
-          aria-disabled="true"
-          title="Data sources — coming soon"
-          className={`${baseLink} ${idleLink} cursor-not-allowed opacity-60`}
+        {/* Settings / Data Sources — activated in P5.2. */}
+        <NavLink
+          to={SETTINGS_NAV_ITEM.to}
+          className={({ isActive }) =>
+            `${baseLink} ${isActive ? activeLink : idleLink}`
+          }
         >
           <span aria-hidden="true" className="text-xs">
-            ⚙
+            {SETTINGS_NAV_ITEM.icon}
           </span>
-          Data sources
-        </span>
+          {SETTINGS_NAV_ITEM.label}
+        </NavLink>
 
         <button
           type="button"

@@ -11,9 +11,11 @@
 
 import type {
   Budget,
+  ConnectionsList,
   Debt,
   Goals,
   Investments,
+  LinkTokenResponse,
   NetWorth,
   PaginatedTransactions,
 } from '../lib/types';
@@ -230,4 +232,63 @@ export const emptyGoals: Goals = {
 export const emptyTransactions: PaginatedTransactions = {
   data: [],
   pagination: { limit: 50, offset: 0, total: 0 },
+};
+
+// --- Connections (Settings screen) -------------------------------------------
+// Exercises every `item_status` across the five sources so the Settings screen
+// can render all states + affordances. ALL values are synthetic (no Plaid creds,
+// no real tokens — see `.claude/rules/data-privacy.md`).
+
+export const connectionsFixture: ConnectionsList = {
+  items: [
+    {
+      item_id: 'item-synthetic-001',
+      institution: 'Example Bank',
+      products: ['transactions', 'liabilities'],
+      status: 'connected',
+      sources: ['transactions', 'loans'],
+      last_synced: '2026-05-24T09:00:00Z',
+    },
+    {
+      item_id: 'item-synthetic-002',
+      institution: 'Sample Brokerage',
+      products: ['investments'],
+      status: 'needs_reauth',
+      sources: ['holdings'],
+      last_synced: '2026-05-10T09:00:00Z',
+    },
+    {
+      item_id: 'item-synthetic-003',
+      institution: 'Demo Payroll Co',
+      products: ['income'],
+      status: 'error',
+      sources: ['income'],
+    },
+  ],
+  // One row per source, covering connected / needs_reauth / error / not_connected.
+  sources: [
+    { source: 'transactions', mode: 'api', status: 'connected' },
+    { source: 'income', mode: 'api', status: 'error' },
+    { source: 'holdings', mode: 'api', status: 'needs_reauth' },
+    { source: 'loans', mode: 'api', status: 'connected' },
+    { source: 'listings', mode: 'local', status: 'not_connected' },
+  ],
+};
+
+/** DA-20 empty: nothing linked yet — every source is local + not_connected. */
+export const emptyConnections: ConnectionsList = {
+  items: [],
+  sources: [
+    { source: 'transactions', mode: 'local', status: 'not_connected' },
+    { source: 'income', mode: 'local', status: 'not_connected' },
+    { source: 'holdings', mode: 'local', status: 'not_connected' },
+    { source: 'loans', mode: 'local', status: 'not_connected' },
+    { source: 'listings', mode: 'local', status: 'not_connected' },
+  ],
+};
+
+/** Synthetic Plaid Link token (sandbox-shaped, never a real credential). */
+export const linkTokenFixture: LinkTokenResponse = {
+  link_token: 'link-sandbox-0000-synthetic',
+  expiration: '2026-05-24T10:30:00Z',
 };

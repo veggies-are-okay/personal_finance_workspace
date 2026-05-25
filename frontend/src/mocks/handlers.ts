@@ -16,10 +16,13 @@
 
 import { http, HttpResponse } from 'msw';
 import { apiBaseUrl } from '../lib/api';
+import type { ExchangeResponse, Source, SourceMode } from '../lib/types';
 import {
   budgetFixture,
+  connectionsFixture,
   debtFixture,
   emptyBudget,
+  emptyConnections,
   emptyDebt,
   emptyGoals,
   emptyInvestments,
@@ -27,6 +30,7 @@ import {
   emptyTransactions,
   goalsFixture,
   investmentsFixture,
+  linkTokenFixture,
   networthFixture,
   transactionsFixture,
 } from './fixtures';
@@ -64,6 +68,12 @@ function viewHandler<T>(path: string, populated: T, empty: T) {
   });
 }
 
+/** Map a connected/error-status row back to an `item_status` after a Plaid run. */
+const EXCHANGE_RESULT: ExchangeResponse = {
+  item_id: 'item-synthetic-001',
+  status: 'connected',
+};
+
 export const handlers = [
   http.get(`${apiBaseUrl}/health`, () => HttpResponse.json({ status: 'ok' })),
   viewHandler('/api/v1/transactions', transactionsFixture, emptyTransactions),
@@ -72,4 +82,27 @@ export const handlers = [
   viewHandler('/api/v1/investments', investmentsFixture, emptyInvestments),
   viewHandler('/api/v1/debt', debtFixture, emptyDebt),
   viewHandler('/api/v1/goals', goalsFixture, emptyGoals),
+
+  // --- Connections (P6.1 backend; mocked here per DA-21) ---------------------
+  viewHandler('/api/v1/connections', connectionsFixture, emptyConnections),
+  http.post(`${apiBaseUrl}/api/v1/connections/link-token`, () =>
+    HttpResponse.json(linkTokenFixture),
+  ),
+  http.post(`${apiBaseUrl}/api/v1/connections/exchange`, () =>
+    HttpResponse.json(EXCHANGE_RESULT),
+  ),
+  // Mock-only (NOT canonical): the Local↔API toggle target until P6.4 wires the
+  // adapter swap. Echoes a snapshot with the one source flipped to the new mode.
+  http.post(`${apiBaseUrl}/api/v1/connections/source-mode`, async ({ request }) => {
+    const { source, mode } = (await request.json()) as {
+      source: Source;
+      mode: SourceMode;
+    };
+    return HttpResponse.json({
+      ...connectionsFixture,
+      sources: connectionsFixture.sources.map((row) =>
+        row.source === source ? { ...row, mode } : row,
+      ),
+    });
+  }),
 ];
