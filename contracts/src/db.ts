@@ -232,3 +232,43 @@ export async function seedBudgetFixture(): Promise<void> {
     }
   });
 }
+
+// --- Net Worth fixture (P4.3) ----------------------------------------------
+//
+// The Net Worth view composes the `accounts` table (DA-23 spirit: a thin read,
+// no recompute), so the cross-backend identity test (DA-9) pins those rows. A
+// high fixed-id prefix keeps the fixture isolated. Rows span assets, a liability
+// (negative balance), and a null balance, and are inserted out of name order to
+// prove both backends sort identically.
+
+/** Synthetic accounts both backends serve in the net-worth parity test. */
+export const NETWORTH_ACCOUNTS = [
+  { id: 940001, name: "Brokerage", type: "investment", balance: "60000.00" },
+  { id: 940002, name: "Checking", type: "depository", balance: "28900.00" },
+  { id: 940003, name: "Roth IRA", type: "retirement", balance: "90000.00" },
+  // A null balance counts as 0 and never shifts the totals.
+  { id: 940004, name: "Unfunded", type: "depository", balance: null },
+  { id: 940005, name: "Visa", type: "credit", balance: "-26560.00" },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupNetworthFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM accounts WHERE id = ANY($1::bigint[])", [
+      NETWORTH_ACCOUNTS.map((a) => a.id),
+    ]);
+  });
+}
+
+/** Insert the synthetic accounts fixture (cleans first), out of name order. */
+export async function seedNetworthFixture(): Promise<void> {
+  await cleanupNetworthFixture();
+  await withClient(async (client) => {
+    for (const a of NETWORTH_ACCOUNTS) {
+      await client.query(
+        "INSERT INTO accounts (id, name, type, balance) VALUES ($1, $2, $3, $4)",
+        [a.id, a.name, a.type, a.balance],
+      );
+    }
+  });
+}

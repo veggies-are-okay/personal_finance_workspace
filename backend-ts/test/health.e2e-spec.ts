@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
 import {
+  AccountEntity,
   BudgetAggregateEntity,
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
@@ -54,6 +55,8 @@ describe('HealthController (e2e)', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue({})
       .compile();
 

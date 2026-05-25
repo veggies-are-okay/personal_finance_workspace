@@ -20,60 +20,37 @@ import { CanonicalExceptionFilter } from '../src/errors/canonical-exception.filt
 import { canonicalValidationExceptionFactory } from '../src/errors/validation-exception.factory';
 
 /**
- * E2E contract for `GET /api/v1/budget` (parity twin of the FastAPI
- * `test_budget.py`). Runs the FULL Nest stack — global `ValidationPipe` +
- * `CanonicalExceptionFilter` — with the aggregate repositories and the TypeORM
+ * E2E contract for `GET /api/v1/networth` (parity twin of the FastAPI
+ * `test_networth.py`). Runs the FULL Nest stack — global `ValidationPipe` +
+ * `CanonicalExceptionFilter` — with the `accounts` repository and the TypeORM
  * DataSource overridden by fakes, so it needs no live DB.
  *
  * Asserts the same scenarios the parity harness checks cross-backend: the full
- * design §3 response shape (money decimal-string, percentages numeric, dates
- * YYYY-MM-DD, deterministic ordering) and the canonical 503 on a DB failure
- * (DA-18). Reads precomputed rows only — no recompute (DA-23).
+ * design §3 response shape (totals as money decimal-strings via the
+ * signed-balance convention, accounts in name order, `delta_30d` "0.00", empty
+ * `series`) and the canonical 503 on a DB failure (DA-18). Thin read only — no
+ * recompute (DA-23).
  */
-const AGG = { window: '12m', savingsRate: '22.0', effectiveTaxRate: '18.5' };
-const BUCKETS = [
-  {
-    window: '12m',
-    name: 'savings',
-    targetPct: '20.0',
-    actualPct: '22.0',
-    amount: '1100.00',
-  },
-  {
-    window: '12m',
-    name: 'needs',
-    targetPct: '50.0',
-    actualPct: '48.0',
-    amount: '2400.00',
-  },
-];
-const RECURRING = [
-  {
-    merchant: 'Streaming Co',
-    category: 'entertainment',
-    cadence: 'monthly',
-    lastCharged: '2026-05-01',
-    monthlyEst: '15.99',
-  },
+const ACCOUNTS = [
+  { id: '1', name: 'Brokerage', type: 'investment', balance: '60000.00' },
+  { id: '2', name: 'Checking', type: 'depository', balance: '28900.00' },
+  { id: '3', name: 'Roth IRA', type: 'retirement', balance: '90000.00' },
+  { id: '4', name: 'Unfunded', type: 'depository', balance: null },
+  { id: '5', name: 'Visa', type: 'credit', balance: '-26560.00' },
 ];
 
-describe('BudgetController (e2e)', () => {
+describe('NetWorthController (e2e)', () => {
   let app: INestApplication;
   let server: Server;
   let failNext = false;
 
-  const aggRepo = {
-    findOne: jest.fn(() =>
+  const accountRepo = {
+    find: jest.fn(() =>
       failNext
         ? Promise.reject(new Error('connection refused'))
-        : Promise.resolve(AGG),
+        : Promise.resolve(ACCOUNTS),
     ),
-    find: jest.fn(),
   };
-  const bucketRepo = { find: jest.fn().mockResolvedValue(BUCKETS) };
-  const categoryRepo = { find: jest.fn().mockResolvedValue([]) };
-  const monthlyRepo = { find: jest.fn().mockResolvedValue([]) };
-  const recurringRepo = { find: jest.fn().mockResolvedValue(RECURRING) };
 
   const fakeDataSource: Partial<DataSource> = {
     isInitialized: true,
@@ -89,17 +66,17 @@ describe('BudgetController (e2e)', () => {
       .overrideProvider(getRepositoryToken(TransactionEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(BudgetAggregateEntity))
-      .useValue(aggRepo)
-      .overrideProvider(getRepositoryToken(BudgetBucketAggregateEntity))
-      .useValue(bucketRepo)
-      .overrideProvider(getRepositoryToken(BudgetCategoryAggregateEntity))
-      .useValue(categoryRepo)
-      .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
-      .useValue(monthlyRepo)
-      .overrideProvider(getRepositoryToken(RecurringChargeEntity))
-      .useValue(recurringRepo)
-      .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetBucketAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetCategoryAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AccountEntity))
+      .useValue(accountRepo)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -123,48 +100,52 @@ describe('BudgetController (e2e)', () => {
     failNext = false;
   });
 
-  interface BudgetBody {
-    savings_rate: number;
-    effective_tax_rate: number;
-    buckets: Array<Record<string, unknown>>;
-    categories: unknown[];
-    monthly: unknown[];
-    recurring: Array<Record<string, unknown>>;
+  interface NetWorthBody {
+    net_worth: string;
+    assets: string;
+    liabilities: string;
+    series: unknown[];
+    accounts: Array<Record<string, unknown>>;
   }
   interface ErrorBody {
     error: { code: string; message: string; details: unknown[] };
   }
 
-  it('GET /api/v1/budget -> 200 design §3 shape (money string, pct number)', () =>
+  it('GET /api/v1/networth -> 200 design §3 shape (signed-balance totals)', () =>
     request(server)
-      .get('/api/v1/budget')
+      .get('/api/v1/networth')
       .expect(200)
       .expect((res) => {
-        const body = res.body as BudgetBody;
+        const body = res.body as NetWorthBody;
         expect(Object.keys(body).sort()).toEqual([
-          'buckets',
-          'categories',
-          'effective_tax_rate',
-          'monthly',
-          'recurring',
-          'savings_rate',
+          'accounts',
+          'assets',
+          'liabilities',
+          'net_worth',
+          'series',
         ]);
-        // Percentages are numbers (DA-22); money is a string (DA-2).
-        expect(body.savings_rate).toBe(22);
-        expect(body.effective_tax_rate).toBe(18.5);
-        // Buckets ordered 50/30/20.
-        expect(body.buckets.map((b) => b.name)).toEqual(['needs', 'savings']);
-        expect(body.buckets[0].amount).toBe('2400.00');
-        expect(typeof body.buckets[0].target_pct).toBe('number');
-        // Recurring carries a YYYY-MM-DD date + decimal-string estimate.
-        expect(body.recurring[0].last_charged).toBe('2026-05-01');
-        expect(body.recurring[0].monthly_est).toBe('15.99');
+        // Money totals are decimal STRINGS (DA-2) via the signed convention.
+        expect(body.assets).toBe('178900.00');
+        expect(body.liabilities).toBe('26560.00');
+        expect(body.net_worth).toBe('152340.00');
+        // Accounts in name order; null balance -> "0.00"; delta_30d zero.
+        expect(body.accounts.map((a) => a.name)).toEqual([
+          'Brokerage',
+          'Checking',
+          'Roth IRA',
+          'Unfunded',
+          'Visa',
+        ]);
+        expect(body.accounts[0].balance).toBe('60000.00');
+        expect(body.accounts[0].delta_30d).toBe('0.00');
+        // No history source -> empty series.
+        expect(body.series).toEqual([]);
       }));
 
-  it('GET /api/v1/budget with a DB failure -> 503 canonical (DA-18)', () => {
+  it('GET /api/v1/networth with a DB failure -> 503 canonical (DA-18)', () => {
     failNext = true;
     return request(server)
-      .get('/api/v1/budget')
+      .get('/api/v1/networth')
       .expect(503)
       .expect((res) => {
         const body = res.body as ErrorBody;

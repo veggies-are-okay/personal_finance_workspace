@@ -67,7 +67,7 @@
 - [x] Both backends read `budget_aggregates`/`recurring_charges` only.
   - *Verify:* Appendix B gates + parity; a **cross-backend identity** parity test asserts `/budget` is byte-identical from FastAPI and NestJS for a seeded DB (DA-9); percentages numeric, money decimal-string.
   - *Done (2026-05-24):* FastAPI `app/routers/budget.py` + `Budget`/`BudgetBucket`/`BudgetCategory`/`MonthlyNeedsWants`/`RecurringChargeOut` Pydantic models in `app/schemas.py`; NestJS `src/budget/` (controller + `BudgetQueryDto` + service reading 5 aggregate repos, `formatPercent` helper). Thin reads of the precomputed `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges` — **no recompute in either backend** (DA-23). `window` selector (default `12m`); deterministic ordering (50/30/20 buckets, categories/monthly/recurring sorted); empty DB → zeros + empty arrays. Money decimal-string, percentages numeric 0–100 (DA-22), dates `YYYY-MM-DD`; DB-down → canonical 503 (DA-18). `contracts/test/budget.parity.test.ts` covers cross-backend identity (DA-9) + unknown-window-empty + DB-down 503; `seedBudgetFixture`/`cleanupBudgetFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` adds the path (OpenAPI structural diff clean). Gates: Python 135 tests / 99% cov; TS 100 tests / 90.6% cov; parity 54 passed.
-### P4.3 — `GET /api/v1/networth`  *(type: BE)* — Both backends + parity.
+### P4.3 — `GET /api/v1/networth`  *(type: BE)* — Both backends + parity. ✅ [x]
   - *Verify:* Appendix B gates + parity; empty-DB → zeros/empty arrays, identical both backends.
 ### P4.4 — `GET /api/v1/investments`  *(type: BE)* — Both backends + parity.
   - *Verify:* Appendix B gates + parity; concentration/allocation numeric percentages (Appendix A).
