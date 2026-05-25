@@ -52,7 +52,7 @@
 - [x] Loader writes the normalized ledger to `transactions`; re-import **upserts** on the dedupe key `hash(account, date, signed_amount, normalized_description)` (DA-19).
   - *Verify:* on synthetic fixtures, loading **twice** yields no duplicates and identical row counts; the dedupe key is unique-constrained; root gate `uv run pytest` green.
 ### P3.2 — Precompute deterministic analytics  *(type: BE-PY)*
-- [ ] Port the EDA logic (categorization, transfer + recurring detection, 50/30/20 buckets, savings rate, monthly aggregates) from the notebooks into `scripts/` (productionized) → `budget_aggregates` + `recurring_charges` + enrichment cols. Percentages numeric 0–100 (Appendix A). **No categorization logic in TS.** (DA-9/22)
+- [x] Port the EDA logic (categorization, transfer + recurring detection, 50/30/20 buckets, savings rate, monthly aggregates) from the notebooks into `scripts/` (productionized) → `budget_aggregates` + `recurring_charges` + enrichment cols. Percentages numeric 0–100 (Appendix A). **No categorization logic in TS.** (DA-9/22) — Added the `paystubs` income table (model + Alembic `ba4cb087cce7` + mirrored `PaystubEntity` + schema-parity updated), an idempotent income loader (`app/ingestion/income_loader.py`), and the Python-only `app/precompute/` package writing every `/budget` aggregate table. Golden-fixture tests assert exact values + determinism; both backends only READ these tables.
   - *Verify:* **golden-fixture** tests (synthetic input → asserted aggregate values) pass and are deterministic across runs; both backends later read these tables without recomputing (asserted by the P4.2 cross-backend identity test).
 
 ## Wave 1 — View endpoints (CSV/precomputed) + frontend

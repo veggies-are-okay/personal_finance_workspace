@@ -12,8 +12,8 @@ import { ALL_ENTITIES } from './entities';
  * constructable (exercising each class body).
  */
 describe('ALL_ENTITIES', () => {
-  it('exports the full set of P2.3 entities', () => {
-    expect(ALL_ENTITIES).toHaveLength(14);
+  it('exports the full set of P2.3 entities + the P3.2 paystubs table', () => {
+    expect(ALL_ENTITIES).toHaveLength(15);
     // No duplicates.
     expect(new Set(ALL_ENTITIES).size).toBe(ALL_ENTITIES.length);
   });

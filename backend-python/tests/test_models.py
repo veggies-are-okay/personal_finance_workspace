@@ -13,7 +13,7 @@ from sqlalchemy import ARRAY, Date, DateTime, LargeBinary, Numeric, Text
 from app import models
 from app.db import Base
 
-# All 14 tables P2.3 defines.
+# All P2.3 tables + the P3.2 paystubs income table.
 EXPECTED_TABLES = {
     "accounts",
     "transactions",
@@ -27,6 +27,7 @@ EXPECTED_TABLES = {
     "budget_category_aggregates",
     "budget_monthly_aggregates",
     "recurring_charges",
+    "paystubs",
     "plaid_items",
     "source_config",
 }
@@ -46,6 +47,11 @@ def test_money_columns_are_numeric_14_2() -> None:
         ("holdings", "value"),
         ("budget_monthly_aggregates", "needs"),
         ("recurring_charges", "monthly_est"),
+        ("paystubs", "gross_pay"),
+        ("paystubs", "net_pay"),
+        ("paystubs", "taxes"),
+        ("paystubs", "retirement_401k_employee"),
+        ("paystubs", "retirement_401k_employer"),
     ]:
         coltype = Base.metadata.tables[table].columns[col].type
         assert isinstance(coltype, Numeric)
@@ -93,6 +99,21 @@ def test_products_is_text_array() -> None:
 def test_date_columns() -> None:
     assert isinstance(Base.metadata.tables["transactions"].columns["date"].type, Date)
     assert isinstance(Base.metadata.tables["recurring_charges"].columns["last_charged"].type, Date)
+
+
+def test_paystubs_schema() -> None:
+    # P3.2 income source: period/pay dates are Date; the income inputs to
+    # precompute (gross/net/taxes/401k) are money; dedupe_key is unique (DA-19).
+    cols = Base.metadata.tables["paystubs"].columns
+    for name in ("period_start", "period_end", "pay_date"):
+        assert isinstance(cols[name].type, Date), f"{name} must be a Date"
+    table = Base.metadata.tables["paystubs"]
+    unique_cols = {
+        tuple(c.name for c in con.columns)
+        for con in table.constraints
+        if con.__class__.__name__ == "UniqueConstraint"
+    }
+    assert ("dedupe_key",) in unique_cols
 
 
 def test_transactions_dedupe_key_is_unique() -> None:
