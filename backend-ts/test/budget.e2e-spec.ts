@@ -12,6 +12,7 @@ import {
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  HoldingEntity,
   RecurringChargeEntity,
   TransactionEntity,
 } from '../src/entities/entities';
@@ -97,6 +98,8 @@ describe('BudgetController (e2e)', () => {
       .useValue(monthlyRepo)
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
       .useValue(recurringRepo)
+      .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();

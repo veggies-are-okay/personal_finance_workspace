@@ -24,6 +24,7 @@
 
 > - 2026-05-24: **`GET /api/v1/transactions`** (P4.1) — the first real view endpoint, in **both** backends at parity. Python: `app/routers/transactions.py` (Pydantic query/response models, LEFT JOIN `accounts`, date/account/category/`q` filters, offset/limit `Paginated<T>` envelope) + `app/errors.py` (canonical error envelope; `RequestValidationError`→**422**, `ServiceUnavailableError`→**503**). TS: `src/transactions/` (controller + query DTO + TypeORM service) + `src/errors/` (global `CanonicalExceptionFilter` + `ValidationPipe` `exceptionFactory`→422); `app.module.ts` gained a resilient `dataSourceFactory` so a DB-down boot still serves `/health` and 503s DB routes (DA-18). Established reusable patterns: money decimal-string, dates `YYYY-MM-DD`, omit-absent (DA-6), canonical 422 (DA-1) / 503 (DA-18). Contracts: `test/transactions.parity.test.ts` (success / 422 / offset-past-end / DB-down 503) + `src/db.ts` (synthetic seed) + `startDbDownBackends`; `IMPLEMENTED_PATHS` now includes the path so the structural OpenAPI diff covers it. — P4.1.
 > - 2026-05-24: **`GET /api/v1/budget`** (P4.2) — the Budget view in **both** backends at parity, a **thin read** of the precomputed aggregate tables (`budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`) — **no recompute** in either backend (DA-23). Python: `app/routers/budget.py` + `Budget`/`BudgetBucket`/`BudgetCategory`/`MonthlyNeedsWants`/`RecurringChargeOut` Pydantic models in `app/schemas.py` (money decimal-string, percentages numeric 0–100 via `field_serializer`). TS: `src/budget/` (controller + query DTO + service reading 5 aggregate repos; `formatPercent` numeric helper, reuses `formatMoney`/`formatDate`). `window` selector (default `12m`); deterministic ordering (50/30/20 buckets, categories/monthly/recurring sorted); empty DB → zeros + empty arrays. Contracts: `test/budget.parity.test.ts` (cross-backend identity DA-9 / unknown-window-empty / DB-down 503) + `seedBudgetFixture`/`cleanupBudgetFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.2.
+> - 2026-05-24: **`GET /api/v1/investments`** (P4.4) — the Investments view in **both** backends at parity, a **thin read** of the `holdings` table — **no recompute** in either backend (DA-23). Python: `app/routers/investments.py` + `Investments`/`Allocation`/`Concentration`/`Holding` Pydantic models in `app/schemas.py` (money decimal-string, percentages numeric 0–100; `class` aliased from `class_`). TS: `src/investments/` (controller + service reading the `holdings` repo; sums money in integer **cents** for byte-identical totals, reuses `formatMoney`/`formatPercent`). `portfolio_value`/`unrealized_gain` summed; `allocation[]` grouped by asset class (`actual_pct`=market share, `target_pct`=summed per-holding weights); `concentration[]` per-holding market share ranked desc; `holdings[]` by symbol; empty DB → `"0.00"` totals + empty arrays. Contracts: `test/investments.parity.test.ts` (cross-backend identity DA-9 / empty / DB-down 503) + `seedInvestmentsFixture`/`cleanupInvestmentsFixture` in `src/db.ts`; `IMPLEMENTED_PATHS` now includes the path (structural OpenAPI diff clean). — P4.4.
 
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
@@ -58,9 +59,11 @@ personal_finance/
 │   │                          #     errors.py (P4.1 canonical error envelope; validation→422, DB-down→503) ·
 │   │                          #     routers/transactions.py (P4.1 GET /api/v1/transactions: filters + Paginated<T>) ·
 │   │                          #     routers/budget.py (P4.2 GET /api/v1/budget: thin read of budget_* aggregates) ·
+│   │                          #     routers/investments.py (P4.4 GET /api/v1/investments: thin read of holdings) ·
 │   │                          #     schemas.py (HealthResponse + Transaction/Pagination/PaginatedTransactions/
 │   │                          #       TransactionQuery + Budget/BudgetBucket/BudgetCategory/MonthlyNeedsWants/
-│   │                          #       RecurringChargeOut) · main.py (create_app, CORS, handlers, /health + tx + budget)
+│   │                          #       RecurringChargeOut + Investments/Allocation/Concentration/Holding) ·
+│   │                          #       main.py (create_app, CORS, handlers, /health + tx + budget + investments)
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
 │   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema · ba4cb087cce7_* = P3.2 paystubs
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
@@ -75,8 +78,10 @@ personal_finance/
 │   │                          #     errors/ (P4.1 canonical envelope: filter + validation factory → 422/503) ·
 │   │                          #     transactions/ (P4.1 controller + query DTO + TypeORM service) ·
 │   │                          #     budget/ (P4.2 controller + query DTO + service reading 5 aggregate repos) ·
+│   │                          #     investments/ (P4.4 controller + service reading the holdings repo, cents sum) ·
 │   │                          #     health/ (module · controller · service · health-response.dto.ts + *.spec.ts)
-│   ├── test/                  #   health.e2e-spec.ts · transactions.e2e-spec.ts · budget.e2e-spec.ts (Supertest;
+│   ├── test/                  #   health.e2e-spec.ts · transactions.e2e-spec.ts · budget.e2e-spec.ts ·
+│   │                          #     investments.e2e-spec.ts (Supertest;
 │   │                          #     DataSource + repos overridden → boots without a DB; success/422/503 cases)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
@@ -91,11 +96,12 @@ personal_finance/
 │   │                          #     (Vitest globalSetup) · normalize.ts (OpenAPI structural normalizer) ·
 │   │                          #     contract.ts (canonical loader + IMPLEMENTED_PATHS allowlist) ·
 │   │                          #     schema.ts (schema-parity check, DA-8) · db.ts (synthetic seeds for
-│   │                          #     value-parity: transactions P4.1 + budget P4.2) · http.ts
+│   │                          #     value-parity: transactions P4.1 + budget P4.2 + investments P4.4) · http.ts
 │   ├── test/                  #   health-response.parity · openapi.parity (structural diff, scoped to
 │   │                          #     implemented paths) · schema.parity (Alembic head ↔ TypeORM entities) ·
 │   │                          #     transactions.parity (P4.1: success/422/offset/503) ·
 │   │                          #     budget.parity (P4.2: cross-backend identity DA-9 / empty / 503) ·
+│   │                          #     investments.parity (P4.4: cross-backend identity DA-9 / empty / 503) ·
 │   │                          #     endpoints.parity.stubs (it.todo per endpoint) ·
 │   │                          #     normalize.unit · contract.unit · backends.unit · schema.unit
 │   ├── package.json           #   scripts: `test:parity` (canonical gate; pretest builds both backends) ·
