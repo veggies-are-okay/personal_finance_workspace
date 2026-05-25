@@ -25,7 +25,7 @@ Drives the **`checklist-phase-runner-parallel`** skill. Within a stage, independ
 | Stage | Done | Last updated |
 |-------|------|--------------|
 | 1 | - [x] | 2026-05-24 (P2.1 + P2.2 merged via PR #1) |
-| 2 | - [ ] | |
+| 2 | - [x] | 2026-05-24 (P2.3 merged via PR #5) |
 | 3 | - [ ] | |
 | 4 | - [ ] | |
 | 5 | - [ ] | |
