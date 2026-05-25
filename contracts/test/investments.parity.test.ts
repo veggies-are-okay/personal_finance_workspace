@@ -28,10 +28,7 @@ import {
   killTree,
   type BackendHandle,
 } from "../src/backends";
-import {
-  seedInvestmentsFixture,
-  cleanupInvestmentsFixture,
-} from "../src/db";
+import { seedInvestmentsFixture, cleanupInvestmentsFixture } from "../src/db";
 
 const pyBase = inject("pyBase");
 const tsBase = inject("tsBase");

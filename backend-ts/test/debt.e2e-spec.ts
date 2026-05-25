@@ -14,6 +14,8 @@ import {
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   GoalEntity,
+  PlaidItemEntity,
+  SourceConfigEntity,
   HoldingEntity,
   LoanEntity,
   RecurringChargeEntity,
@@ -94,6 +96,10 @@ describe('DebtController (e2e)', () => {
       .overrideProvider(getRepositoryToken(HoldingEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PlaidItemEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(SourceConfigEntity))
       .useValue({})
       .compile();
 

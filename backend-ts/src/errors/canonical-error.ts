@@ -85,3 +85,13 @@ export class CanonicalServiceUnavailableException extends CanonicalHttpException
     );
   }
 }
+
+/** 401 verification-failed with the canonical envelope (P6.1 webhook). */
+export class CanonicalUnauthorizedException extends CanonicalHttpException {
+  constructor(message = 'Webhook signature verification failed.') {
+    super(
+      HttpStatus.UNAUTHORIZED,
+      buildErrorBody(ErrorCode.UNAUTHORIZED, message, []),
+    );
+  }
+}

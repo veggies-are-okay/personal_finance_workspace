@@ -69,18 +69,8 @@ describe("source endpoints — value parity (TODO: Stage-4 BE branches)", () => 
   );
 });
 
-describe("connections endpoints — value parity (TODO: Stage-4 BE branches)", () => {
-  // P6.1 — connections lifecycle + webhook.
-  it.todo(
-    "POST /api/v1/connections/link-token: identical link_token/expiration shape; expiration ISO-8601 Z",
-  );
-  it.todo(
-    "POST /api/v1/connections/exchange: identical {item_id,status}; access_token never returned; encrypted at rest (DA-12)",
-  );
-  it.todo(
-    "GET /api/v1/connections: identical items + per-source mode/status snapshot",
-  );
-  it.todo(
-    "POST /api/v1/connections/webhook: forged/unsigned JWT -> identical 401 canonical body (DA-11); valid -> {status:accepted}",
-  );
-});
+// P6.1 — connections lifecycle + webhook: IMPLEMENTED. The link-token shape,
+// exchange (encrypted at rest, no plaintext, cross-backend decrypt), the
+// connections snapshot, the forged/unsigned-webhook-401, the log-scrub, and the
+// redirect-allowlist value-parity assertions live in their own file
+// (test/connections.parity.test.ts), per the Stage-4 branch convention.

@@ -81,8 +81,17 @@ via `DATABASE_URL`) don't collide. Unset → the defaults above (CI is unchanged
   deterministic ordering (50/30/20 buckets, categories/monthly/recurring sorted). Also covers an
   unknown window → identical zeros + empty arrays, and — against the unreachable-DB backend pair —
   an identical canonical **503** (DA-18).
+- **`test/connections.parity.test.ts`** (P6.1) — value + **security** parity for the connections
+  API. Both backends boot with `PLAID_FAKE=1` (network-free fake Plaid gateway) and a SYNTHETIC
+  shared `APP_ENCRYPTION_KEY`. Covers: identical `link-token`/`exchange` shapes (expiration ISO-`Z`,
+  access_token never returned); **no plaintext token at rest** (the `plaid_items.access_token` BYTEA
+  has no token substring); **cross-backend decrypt** (DA-12) — a token written by FastAPI decrypts
+  with `node:crypto` and a token written by NestJS decrypts with the Python `cryptography.AESGCM`
+  (via a `uv run` subprocess); the `{items,sources}` snapshot; forged + unsigned webhook → identical
+  canonical **401** (DA-11); a **log-scrub** check (no token string in either backend's captured
+  logs, DA-14); and the OAuth **redirect allowlist** rejecting a non-allowlisted URI (no open redirect).
 - **`test/endpoints.parity.stubs.test.ts`** — per-endpoint **value-parity stubs**
-  (`it.todo`) for every not-yet-implemented view/source/connections endpoint; each names
+  (`it.todo`) for every not-yet-implemented view/source endpoint; each names
   the concrete same-request→same-body / error / empty / degraded assertion a Stage-4 `BE`
   branch must fill in.
 - **`test/normalize.unit.test.ts`** — pure unit tests for the normalizer.

@@ -17,6 +17,8 @@ import {
   LoanEntity,
   RecurringChargeEntity,
   GoalEntity,
+  PlaidItemEntity,
+  SourceConfigEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 import { CanonicalExceptionFilter } from '../src/errors/canonical-exception.filter';
@@ -108,6 +110,10 @@ describe('BudgetController (e2e)', () => {
       .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PlaidItemEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(SourceConfigEntity))
       .useValue({})
       .compile();
 

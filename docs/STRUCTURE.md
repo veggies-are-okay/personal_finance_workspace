@@ -33,6 +33,8 @@
 
 > - 2026-05-24: **Settings / Data Sources + Plaid Link module** (P5.2, FE). Activated the Sidebar's disabled Data-sources placeholder into a `/settings` `NavLink`; added the `src/features/connections/` module: `SettingsScreen` reads `GET /api/v1/connections` and renders one `SourceCard` per source with its Local↔API `ModeToggle`, status `Badge`, and the right CTA, plus a linked-Items summary. The isolated Plaid flow lives in `usePlaidConnect` (the only `react-plaid-link` coupling): link-token → open Link → `onSuccess(public_token)` → exchange; `ConnectButton` renders **Connect** (`not_connected`/`disconnected`) or **Reconnect** (`needs_reauth`/`error` — Plaid update mode, DA-13); `connected` has no CTA. All four `item_status` states render. `react-plaid-link` is **`vi.mock`-ed in tests** (no real Link/credentials — privacy). `api.ts` gained `postJson` + `getConnections`/`createLinkToken`/`exchangePublicToken`/`setSourceMode`; `types.ts` gained the connections wire types; `mocks/` gained connections fixtures (all states) + handlers (the backend connections endpoints are **P6.1**; mocked per DA-21). The Local↔API toggle POSTs to a **mock-only** `/connections/source-mode` placeholder (NOT canonical — the adapter swap is **P6.4 `BE`**). FE gate green (lint + Vitest 68 tests / 95% stmts ≥80% + build); Playwright screenshot of the Settings screen vs. the mock. — P5.2.
 
+> - 2026-05-24: **Connections API + encrypted Item store + webhook** (P6.1, BE) — the Plaid connection lifecycle in **both** backends at strict parity. Python `app/connections/` + TS `src/connections/` (parity twins): `POST /api/v1/connections/link-token` (Plaid Link token), `POST /api/v1/connections/exchange` (exchange `public_token` → **encrypt + store** the `access_token`, never returned), `GET /api/v1/connections` (per-source `{mode,status}` + linked Items), `POST /api/v1/connections/webhook` (ES256 JWT/JWKS-verified — `iat` freshness + raw-body SHA-256 + rate-limit; unverified/forged/unsigned → canonical **401**, DA-11), and an OAuth redirect with a strict allowlist (no open redirect). **Token-at-rest (DA-12):** AES-256-GCM, key = base64 `APP_ENCRYPTION_KEY`, on-disk `nonce(12)‖ciphertext‖tag(16)` **byte-compatible across backends** (Python `cryptography.AESGCM` ↔ TS `node:crypto`). The Plaid client is **injected** (`PLAID_FAKE=1` selects a network-free fake → CI is hermetic); logs are **token-scrubbed** (DA-14). Reused the canonical 401 in both error layers (`app/errors.py` `UnauthorizedError`; `CanonicalUnauthorizedException`). Contracts: `IMPLEMENTED_PATHS` now includes the four connections paths (structural OpenAPI diff clean) + `test/connections.parity.test.ts` proving identical shapes, **no plaintext at rest**, **cross-backend decrypt**, forged/unsigned-webhook 401, **log-scrub**, and the redirect allowlist; the parity harness boots both backends with `PLAID_FAKE=1` + a synthetic shared key and captures logs to `contracts/.parity-logs/` (gitignored). Happy path verified end-to-end against the **real Plaid Sandbox** locally. — P6.1.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -77,6 +79,10 @@ personal_finance/
 │   │                          #     routers/investments.py (P4.4 GET /api/v1/investments: thin read of holdings) ·
 │   │                          #     routers/debt.py (P4.5 GET /api/v1/debt: thin read of loans + payoff projections) ·
 │   │                          #     routers/goals.py (P4.6 GET /api/v1/goals: thin read of the goals table) ·
+│   │                          #     connections/ (P6.1 Plaid connections API: router.py link-token/exchange/list/
+│   │                          #       webhook + OAuth-redirect allowlist · crypto.py AES-256-GCM token-at-rest,
+│   │                          #       DA-12 · webhook.py ES256 JWT/JWKS verify, DA-11 · plaid_gateway.py +
+│   │                          #       fake_gateway.py injected client (PLAID_FAKE) · redaction.py log scrub, DA-14) ·
 │   │                          #     schemas.py (HealthResponse + Transaction/Pagination/PaginatedTransactions/
 │   │                          #       TransactionQuery + Budget/BudgetBucket/BudgetCategory/MonthlyNeedsWants/
 │   │                          #       RecurringChargeOut + NetWorth/NetWorthAccount/NetWorthSeriesPoint +
@@ -102,10 +108,15 @@ personal_finance/
 │   │                          #     investments/ (P4.4 controller + service reading the holdings repo, cents sum) ·
 │   │                          #     debt/ (P4.5 controller + query DTO + service reading loans repo + payoff sim) ·
 │   │                          #     goals/ (P4.6 controller + service reading the goals repo, exact integer-cents sum) ·
+│   │                          #     connections/ (P6.1 Plaid connections: controller (link-token/exchange/list/webhook +
+│   │                          #       OAuth-redirect allowlist) + service + DTOs · crypto.ts AES-256-GCM token-at-rest,
+│   │                          #       DA-12 · webhook.ts ES256 JWT/JWKS verify, DA-11 · plaid.gateway.ts + fake-gateway.ts
+│   │                          #       injected client (PLAID_FAKE) · redaction.ts log scrub, DA-14) ·
 │   │                          #     health/ (module · controller · service · health-response.dto.ts + *.spec.ts)
 │   ├── test/                  #   health.e2e-spec.ts · transactions.e2e-spec.ts · budget.e2e-spec.ts ·
-│   │                          #     networth.e2e-spec.ts · investments.e2e-spec.ts · debt.e2e-spec.ts · goals.e2e-spec.ts (Supertest;
-│   │                          #     DataSource + repos overridden → boots without a DB; success/422/503 cases)
+│   │                          #     networth.e2e-spec.ts · investments.e2e-spec.ts · debt.e2e-spec.ts · goals.e2e-spec.ts ·
+│   │                          #     connections.e2e-spec.ts (Supertest;
+│   │                          #     DataSource + repos overridden → boots without a DB; success/422/401/503 cases)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)

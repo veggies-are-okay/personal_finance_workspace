@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.connections.router import router as connections_router
 from app.errors import register_exception_handlers
 from app.routers import budget, debt, goals, investments, networth, transactions
 from app.schemas import HealthResponse
@@ -50,6 +51,9 @@ def create_app() -> FastAPI:
     app.include_router(investments.router)
     app.include_router(debt.router)
     app.include_router(goals.router)
+
+    # Connections API (P6.1): Plaid link/exchange/list + JWT-verified webhook.
+    app.include_router(connections_router)
 
     return app
 
