@@ -28,8 +28,8 @@ Drives the **`checklist-phase-runner-parallel`** skill. Within a stage, independ
 | 2 | - [x] | 2026-05-24 (P2.3 merged via PR #5) |
 | 3 | - [x] | 2026-05-24 (P3.1 via PR #6, P3.2 via PR #8 — sequential) |
 | 4 | - [x] | 2026-05-24 (P4.1 #9, P4.2 #10; P4.3–P4.6 built in parallel, integrated via PR #12) |
-| 5 | - [ ] | |
+| 5 | - [x] | 2026-05-24 (P5.1 core screens #13, P5.2 settings/connections #14 — sequential) |
 | 6 | - [ ] | |
 | 7 | - [ ] | |
 
-*Last updated: 2026-05-24 — Stage 4 complete (all six read endpoints live across both backends; Stage 5 frontend next).*
+*Last updated: 2026-05-24 — Stage 5 complete (frontend shell + 6 screens + Settings/connections, mock-driven). Stage 6 (live connectors) needs the owner's Plaid/RentCast credentials.*
