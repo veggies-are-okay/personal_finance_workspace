@@ -8,11 +8,15 @@ import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
 import {
+  AccountEntity,
   BudgetAggregateEntity,
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  HoldingEntity,
+  LoanEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from '../src/entities/entities';
 import { CanonicalExceptionFilter } from '../src/errors/canonical-exception.filter';
@@ -97,6 +101,14 @@ describe('TransactionsController (e2e)', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AccountEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(LoanEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 

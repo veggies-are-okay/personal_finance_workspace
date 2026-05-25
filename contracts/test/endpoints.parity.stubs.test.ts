@@ -43,10 +43,10 @@ describe("view endpoints — value parity (TODO: Stage-4 BE branches)", () => {
     "GET /api/v1/investments: identical bodies; concentration/allocation as numeric percentages (Appendix A)",
   );
 
-  // P4.5 — GET /api/v1/debt
-  it.todo(
-    "GET /api/v1/debt: identical bodies; payoff_strategy/loan_priority enums per registry; avalanche vs minimums",
-  );
+  // P4.5 — GET /api/v1/debt: IMPLEMENTED. The cross-backend identity (DA-9),
+  // avalanche-vs-minimums payoff, enum-per-registry, and DB-down-503 value-parity
+  // assertions live in their own file (test/debt.parity.test.ts), per the
+  // Stage-4 branch convention.
 
   // P4.6 — GET /api/v1/goals
   it.todo("GET /api/v1/goals: identical bodies; money decimal-string");

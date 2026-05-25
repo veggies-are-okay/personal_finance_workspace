@@ -232,3 +232,231 @@ export async function seedBudgetFixture(): Promise<void> {
     }
   });
 }
+
+// --- Net Worth fixture (P4.3) ----------------------------------------------
+//
+// The Net Worth view composes the `accounts` table (DA-23 spirit: a thin read,
+// no recompute), so the cross-backend identity test (DA-9) pins those rows. A
+// high fixed-id prefix keeps the fixture isolated. Rows span assets, a liability
+// (negative balance), and a null balance, and are inserted out of name order to
+// prove both backends sort identically.
+
+/** Synthetic accounts both backends serve in the net-worth parity test. */
+export const NETWORTH_ACCOUNTS = [
+  { id: 940001, name: "Brokerage", type: "investment", balance: "60000.00" },
+  { id: 940002, name: "Checking", type: "depository", balance: "28900.00" },
+  { id: 940003, name: "Roth IRA", type: "retirement", balance: "90000.00" },
+  // A null balance counts as 0 and never shifts the totals.
+  { id: 940004, name: "Unfunded", type: "depository", balance: null },
+  { id: 940005, name: "Visa", type: "credit", balance: "-26560.00" },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupNetworthFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM accounts WHERE id = ANY($1::bigint[])", [
+      NETWORTH_ACCOUNTS.map((a) => a.id),
+    ]);
+  });
+}
+
+// --- Debt fixture (P4.5) ---------------------------------------------------
+//
+// The Debt view reads the `loans` table directly (a thin read; the payoff
+// projections are derived deterministically and identically in both backends,
+// DA-9). The fixture pins three SYNTHETIC loans spanning the rate/priority
+// registry, keyed by a unique name prefix so cleanup never touches other data.
+// Rows are inserted out of rate order to prove both backends sort identically.
+
+const DEBT_NAME_PREFIX = 'ParityP45 ';
+
+/** The fixed synthetic loans both backends serve in the debt parity test. */
+export const SEED_LOANS = [
+  // out of rate order on purpose -> both backends must emit rate desc.
+  {
+    name: `${DEBT_NAME_PREFIX}Loan B`,
+    balance: '8000.00',
+    rate: '4.5',
+    minimumPayment: '100.00',
+    priority: 'then',
+  },
+  {
+    name: `${DEBT_NAME_PREFIX}Loan A`,
+    balance: '12000.00',
+    rate: '6.8',
+    minimumPayment: '150.00',
+    priority: 'pay_first',
+  },
+  {
+    name: `${DEBT_NAME_PREFIX}Loan C`,
+    balance: '6560.00',
+    rate: '3.2',
+    minimumPayment: '70.00',
+    priority: 'minimums',
+  },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupDebtFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query('DELETE FROM loans WHERE name LIKE $1', [
+      `${DEBT_NAME_PREFIX}%`,
+    ]);
+  });
+}
+
+/** Insert the synthetic accounts fixture (cleans first), out of name order. */
+export async function seedNetworthFixture(): Promise<void> {
+  await cleanupNetworthFixture();
+  await withClient(async (client) => {
+    for (const a of NETWORTH_ACCOUNTS) {
+      await client.query(
+        "INSERT INTO accounts (id, name, type, balance) VALUES ($1, $2, $3, $4)",
+        [a.id, a.name, a.type, a.balance],
+      );
+    }
+  });
+}
+
+// --- Investments fixture (P4.4) --------------------------------------------
+//
+// The Investments view is a THIN READ of the `holdings` table (DA-23), so the
+// cross-backend identity test (DA-9) pins those rows. A unique `symbol` prefix
+// keeps the fixture isolated from any other holdings, and rows are inserted out
+// of symbol order to prove both backends order/derive identically. The chosen
+// values land on clean 1dp percentage boundaries so FastAPI's Decimal-quantize
+// and NestJS's toFixed agree exactly.
+//   portfolio = 27000 + 18000 + 5000 = 50000
+//   equities (VTI 27000 + VXUS 18000) -> actual 90.0%, target 45.0+35.0 = 80.0%
+//   bonds    (BND 5000)               -> actual 10.0%, target 20.0%
+//   concentration (market share): VTI 54.0%, VXUS 36.0%, BND 10.0%
+
+const HOLDING_PREFIX = "PARITYP44_";
+
+interface SeedHolding {
+  symbol: string;
+  name: string;
+  value: string; // decimal string
+  weight: string; // percentage 0-100 (the holding's intended weight)
+  gain: string; // decimal string (signed)
+  assetClass: string;
+}
+
+const SEED_HOLDINGS: SeedHolding[] = [
+  {
+    symbol: `${HOLDING_PREFIX}VXUS`,
+    name: "Total Intl ETF",
+    value: "18000.00",
+    weight: "35.0",
+    gain: "1500.00",
+    assetClass: "equities",
+  },
+  {
+    symbol: `${HOLDING_PREFIX}VTI`,
+    name: "Total Market ETF",
+    value: "27000.00",
+    weight: "45.0",
+    gain: "3600.00",
+    assetClass: "equities",
+  },
+  {
+    symbol: `${HOLDING_PREFIX}BND`,
+    name: "Total Bond ETF",
+    value: "5000.00",
+    weight: "20.0",
+    gain: "-200.00",
+    assetClass: "bonds",
+  },
+];
+
+/** Remove any holdings this fixture owns (idempotent; safe before+after). */
+export async function cleanupInvestmentsFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM holdings WHERE symbol LIKE $1", [
+      `${HOLDING_PREFIX}%`,
+    ]);
+  });
+}
+
+// --- Goals fixture (P4.6) --------------------------------------------------
+//
+// The Goals view is a THIN READ of the `goals` table (DA-23), so the
+// cross-backend identity test (DA-9) pins those rows. Goals are keyed by a
+// unique id range + name prefix so cleanup never touches other data. Rows are
+// inserted out of name order to prove both backends sort `funding` identically.
+
+/** A synthetic goal row mirrored across both backends. */
+export interface SeedGoal {
+  id: number;
+  name: string;
+  target: string; // decimal string
+  saved: string; // decimal string
+}
+
+/** The fixed synthetic goals both backends serve in the goals parity test. */
+export const SEED_GOALS: SeedGoal[] = [
+  // Out of name order (Vacation before Emergency Fund) -> both must sort by name.
+  { id: 980002, name: "ParityP46 Vacation", target: "10000.00", saved: "6000.00" },
+  {
+    id: 980001,
+    name: "ParityP46 Emergency Fund",
+    target: "50000.00",
+    saved: "15000.00",
+  },
+];
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupGoalsFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM goals WHERE id = ANY($1::bigint[])", [
+      SEED_GOALS.map((g) => g.id),
+    ]);
+  });
+}
+
+/** Insert the synthetic holdings fixture (cleans first). */
+export async function seedInvestmentsFixture(): Promise<void> {
+  await cleanupInvestmentsFixture();
+  await withClient(async (client) => {
+    for (const h of SEED_HOLDINGS) {
+      await client.query(
+        `INSERT INTO holdings (symbol, name, value, weight, gain, asset_class)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [h.symbol, h.name, h.value, h.weight, h.gain, h.assetClass],
+      );
+    }
+  });
+}
+
+/** Insert the synthetic loans fixture (cleans first). */
+export async function seedDebtFixture(): Promise<void> {
+  await cleanupDebtFixture();
+  await withClient(async (client) => {
+    for (const loan of SEED_LOANS) {
+      await client.query(
+        `INSERT INTO loans (name, balance, rate, minimum_payment, priority)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          loan.name,
+          loan.balance,
+          loan.rate,
+          loan.minimumPayment,
+          loan.priority,
+        ],
+      );
+    }
+  });
+}
+
+/** Insert the synthetic goals fixture (cleans first). */
+export async function seedGoalsFixture(): Promise<void> {
+  await cleanupGoalsFixture();
+  await withClient(async (client) => {
+    for (const g of SEED_GOALS) {
+      await client.query(
+        "INSERT INTO goals (id, name, target, saved) VALUES ($1, $2, $3, $4)",
+        [g.id, g.name, g.target, g.saved],
+      );
+    }
+  });
+}

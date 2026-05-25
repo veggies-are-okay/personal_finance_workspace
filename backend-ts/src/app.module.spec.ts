@@ -10,12 +10,16 @@ import {
   resilientDataSourceFactory,
 } from './app.module';
 import {
+  AccountEntity,
   ALL_ENTITIES,
   BudgetAggregateEntity,
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  HoldingEntity,
+  LoanEntity,
   RecurringChargeEntity,
+  GoalEntity,
   TransactionEntity,
 } from './entities/entities';
 import { HealthController } from './health/health.controller';
@@ -136,6 +140,14 @@ describe('AppModule', () => {
       .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(AccountEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(LoanEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
       .useValue({})
       .compile();
 

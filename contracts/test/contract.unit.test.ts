@@ -49,12 +49,16 @@ describe("canonical contract — frozen path inventory (P2.2 / DA-25)", () => {
     expect(canonicalOperationKeys(doc)).toEqual(EXPECTED_INVENTORY);
   });
 
-  it("implements /health, the P4.1 transactions, and the P4.2 budget endpoints", () => {
+  it("implements /health, P4.1 transactions, P4.2 budget, P4.3 networth, P4.4 investments, P4.5 debt, P4.6 goals endpoints", () => {
     expect([...IMPLEMENTED_PATHS].sort()).toEqual(
       [
         opKey("GET", "/health"),
         opKey("GET", "/api/v1/transactions"),
         opKey("GET", "/api/v1/budget"),
+        opKey("GET", "/api/v1/networth"),
+        opKey("GET", "/api/v1/investments"),
+        opKey("GET", "/api/v1/debt"),
+        opKey("GET", "/api/v1/goals"),
       ].sort(),
     );
   });
@@ -67,12 +71,20 @@ describe("canonical contract — frozen path inventory (P2.2 / DA-25)", () => {
         opKey("GET", "/health"),
         opKey("GET", "/api/v1/transactions"),
         opKey("GET", "/api/v1/budget"),
+        opKey("GET", "/api/v1/networth"),
+        opKey("GET", "/api/v1/investments"),
+        opKey("GET", "/api/v1/debt"),
+        opKey("GET", "/api/v1/goals"),
       ].sort(),
     );
     // A not-yet-built endpoint remains pending (e.g. the webhook).
     expect(pending).toContain(opKey("POST", "/api/v1/connections/webhook"));
     expect(pending).not.toContain(opKey("GET", "/api/v1/transactions"));
     expect(pending).not.toContain(opKey("GET", "/api/v1/budget"));
+    expect(pending).not.toContain(opKey("GET", "/api/v1/networth"));
+    expect(pending).not.toContain(opKey("GET", "/api/v1/investments"));
+    expect(pending).not.toContain(opKey("GET", "/api/v1/debt"));
+    expect(pending).not.toContain(opKey("GET", "/api/v1/goals"));
     expect([...implemented, ...pending].sort()).toEqual(EXPECTED_INVENTORY);
   });
 });

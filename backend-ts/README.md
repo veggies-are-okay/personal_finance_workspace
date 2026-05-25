@@ -28,6 +28,37 @@ identically (see `.claude/rules/backend-parity.md`).
   Money decimal **string**, percentages numeric, dates `YYYY-MM-DD`. **No recompute** — a thin read
   identical to FastAPI's route (DA-9/DA-23). A `src/budget/` module (controller + query DTO + service
   reading 5 aggregate repositories) backs it.
+- `GET /api/v1/networth` (P4.3) → `200` Net Worth view composed from the `accounts` table:
+  `assets` = sum of positive balances, `liabilities` = abs of negative (signed-balance convention),
+  `net_worth` = their net; `accounts[]` sorted by name with `delta_30d` `"0.00"` and `series` empty —
+  the snapshot table holds no balance history, so neither is fabricated (keeps parity). `window`
+  accepted for parity; empty DB → zero totals + empty arrays. Money decimal **string**. **No recompute** —
+  a thin read identical to FastAPI's route (DA-9/DA-23). Totals are summed in integer cents (never a
+  float). A `src/networth/` module (controller + query DTO + service reading the `accounts` repository)
+  backs it.
+- `GET /api/v1/investments` (P4.4) → `200` Investments view, a thin read of the `holdings` table:
+  `portfolio_value`/`unrealized_gain` (summed in integer **cents** so the totals are byte-identical to
+  FastAPI's `Decimal` sum), `allocation[]` (by asset class: `actual_pct` = market share, `target_pct` =
+  summed per-holding weights, `amount`), `concentration[]` (per-holding market share, ranked desc),
+  `holdings[]` (by symbol). Empty DB → `"0.00"` totals + empty arrays. Money decimal **string**,
+  percentages numeric 0–100. **No recompute** — identical to FastAPI's route (DA-9/DA-23). A
+  `src/investments/` module (controller + service reading the `holdings` repository) backs it.
+- `GET /api/v1/debt` (P4.5) → `200` Debt view (thin read of `loans`): `total`, `weighted_avg_rate`
+  (numeric 0–100), `monthly_minimum`, rate `tranches[]` (grouped by rate+priority), `loans[]`, and
+  BOTH `payoff[]` projections — **avalanche** (highest-rate-first acceleration) and **minimums**.
+  The projections come from a deterministic **integer-cent amortization** (`projectPayoff`) that
+  mirrors the FastAPI `project_payoff` exactly (same accrual order, half-up rounding, horizon cap), so
+  `debt_free_year`/`total_interest` match to the cent. `payoff_strategy`/`loan_priority` are the
+  lower_snake registry enums; the optional `strategy` query validates against the registry
+  (unknown → **422**) but does not change the body. Money decimal **string**, rates numeric; empty DB →
+  zeros + empty arrays; DB failure → canonical **503**. A `src/debt/` module (controller + query DTO +
+  service reading the `loans` repository) backs it.
+- `GET /api/v1/goals` (P4.6) → `200` Goals view composed from the `goals` table: `target`/`saved`
+  summed (money decimal **string**), `progress_pct` the overall ratio (numeric 0–100), `funding[]`
+  one `{source,amount}` per goal (sorted by name), `affordability{}` a zero-filled block (no backing
+  table in the P2.3 schema). Empty DB → zeros + empty funding. **No recompute** — a thin read identical
+  to FastAPI's route (DA-9/DA-23). A `src/goals/` module (controller + service reading the `goals`
+  repo, with exact integer-cents summing) backs it.
 
 ## Errors (canonical envelope — parity with FastAPI)
 
