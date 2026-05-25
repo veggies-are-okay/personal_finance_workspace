@@ -2,6 +2,7 @@
 
 > CHANGELOG
 > - 2026-05-24: Initial spec. Backend-owned data connectors (Plaid-primary) behind a stable source/view contract; loosely-coupled frontend (7 screens) built against a mock; contract-first, 3-wave parallel execution. Analysis client deferred. — Connectors pass.
+> - 2026-05-24 (§5, P3.1): The **DB-writing loader/precompute live in `backend-python/`** (`app/ingestion/`) so they run under the `python-backend` CI gate and reuse `app.models`/`app.db`; the raw→normalized-CSV **normalizers stay in `scripts/`**. P3.1 adds the idempotent loader (upsert on the DA-19 dedupe key). — Ingestion→DB pass.
 
 ## 1. Goal & scope
 

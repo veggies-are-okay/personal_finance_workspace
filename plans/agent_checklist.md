@@ -49,7 +49,7 @@
 
 ## P3 — Ingestion & precompute
 ### P3.1 — Load normalized ledger into Postgres (idempotent)  *(type: BE-PY)*
-- [ ] Loader writes the normalized ledger to `transactions`; re-import **upserts** on the dedupe key `hash(account, date, signed_amount, normalized_description)` (DA-19).
+- [x] Loader writes the normalized ledger to `transactions`; re-import **upserts** on the dedupe key `hash(account, date, signed_amount, normalized_description)` (DA-19).
   - *Verify:* on synthetic fixtures, loading **twice** yields no duplicates and identical row counts; the dedupe key is unique-constrained; root gate `uv run pytest` green.
 ### P3.2 — Precompute deterministic analytics  *(type: BE-PY)*
 - [ ] Port the EDA logic (categorization, transfer + recurring detection, 50/30/20 buckets, savings rate, monthly aggregates) from the notebooks into `scripts/` (productionized) → `budget_aggregates` + `recurring_charges` + enrichment cols. Percentages numeric 0–100 (Appendix A). **No categorization logic in TS.** (DA-9/22)
