@@ -66,6 +66,8 @@ via `DATABASE_URL`) don't collide. Unset → the defaults above (CI is unchanged
   structural-diff loop then asserts both backends match the canonical for every
   **implemented** operation (`IMPLEMENTED_PATHS`); **pending** operations are reported as
   skipped, and a guard asserts the canonical doc declares the complete frozen inventory.
+  A **subset guard** (P8.1) asserts FastAPI exposes no path beyond canonical **except** the
+  Python-only `/api/v1/ingest/*` carve-out, and that NestJS exposes **none** of the ingest paths.
 - **`test/transactions.parity.test.ts`** (P4.1) — value parity for
   `GET /api/v1/transactions`. Seeds a synthetic fixture (`src/db.ts`) into the shared
   Postgres, then asserts both backends return identical paginated bodies (money string,
@@ -126,6 +128,18 @@ It bakes in the **Appendix A** conventions as reusable components:
 
 All example values are **synthetic**. Stage-4 endpoint branches **must not edit this file**
 (contract-first; each adds only its implementation + flips an allowlist entry).
+
+### The ingestion carve-out (P8.1) — Python-owned, NOT in this contract
+
+Ingestion/extraction is **Python-owned** and intentionally **out of the 1:1 read-parity
+contract** — exactly like Alembic owns migrations. The upload/extract/load endpoints
+(`POST /api/v1/ingest/{source}`, `source ∈ {transactions, income, holdings, accounts, loans}`)
+depend on Python-only libraries (pdfplumber, PyYAML) and live in the **FastAPI backend ONLY**;
+NestJS implements none of them. Therefore:
+
+- `/api/v1/ingest/*` is **NOT** declared in `openapi.canonical.json` (the canonical doc still has zero ingest paths — asserted by a unit test).
+- The harness **ignores** `/api/v1/ingest/*` when diffing FastAPI's `/openapi.json` against canonical — `isIngestPath()` / `INGEST_PATH_PREFIX` in `src/contract.ts`. A positive **subset guard** keeps this honest: the carve-out is the *only* allowed divergence, so an accidental extra **read** endpoint still fails the gate, and NestJS exposing any ingest path fails too.
+- Only the **read** API stays at strict 1:1 parity. See `.claude/rules/backend-parity.md`.
 
 ### Lint + mock
 

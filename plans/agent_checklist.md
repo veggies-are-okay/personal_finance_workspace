@@ -117,6 +117,15 @@
 - [ ] Run the `security-review` skill over the connections/Plaid surface: encryption at rest, key handling, webhook verification, redirect-URI allowlist (no open redirect), no token/PII leakage.
   - *Verify:* findings triaged; criticals fixed before merge; documented in `pull_requests/`.
 
+## Wave 4 — File-upload onboarding (one upload per source turns raw files into a usable portal)
+
+### P8.1 — Backend ingestion service  *(type: BE-PY; Python-only ingestion surface)*
+- [x] `POST /api/v1/ingest/{source}` (multipart), `source ∈ {transactions, income, holdings, accounts, loans}` — FastAPI ONLY (ingestion is Python-owned, OUT of the read-parity contract, like Alembic owns migrations). `transactions` detects each file's type (CSV header → amex/chase/checking/elan; `.pdf` → Chase extractor) → normalize → `load_ledger` → precompute `12m`+`all`. New loaders: `holdings_loader` (E*TRADE CSV, snapshot-replace), `accounts_loader` (`accounts.yaml`), `loans_loader` (flexible loan CSV). Extractors moved to canonical `app/ingestion/` (`extract_chase`, `extract_paystubs`, `normalize_ledger`); `scripts/*` are thin CLI wrappers. Canonical 422 (no/empty/unparseable file, unknown source) / 503 (DB). Never logs file contents.
+  - *Verify:* Python gate ≥80% + root `uv run pytest` green; parity gate green with `/api/v1/ingest/*` carved out (Python-only, not in canonical, NestJS implements none); `docker compose build backend-python` installs pdfplumber; happy-path screenshot (upload → row counts).
+### P8.2 — Frontend upload UI + nginx routing  *(type: FE + INFRA)*
+- [ ] An onboarding/upload screen (drag-drop per source) posts to `/api/v1/ingest/{source}` and surfaces the summary; nginx routes `/api/v1/ingest/*` to the Python backend only (the TS-wired frontend still uploads to FastAPI for ingestion).
+  - *Verify:* upload a synthetic file in the UI → summary renders → dashboards reflect the new data; frontend gate.
+
 > **Deferred (own spec):** LangGraph + Gemini Flash Lite **analysis client**. **Open follow-up:** E*TRADE-direct adapter pending the P6.2 coverage check (DA-24).
 
 ---
