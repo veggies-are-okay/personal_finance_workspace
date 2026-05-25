@@ -15,6 +15,11 @@ dependencies = [
     "plaid-python>=18.0",
     "cryptography>=43.0",
     "pyjwt[crypto]>=2.9",
+    # Ingestion (P8.1): PDF extraction (Chase statements / pay stubs), accounts
+    # YAML parsing, and multipart upload parsing for the /ingest endpoints.
+    "pdfplumber>=0.11",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.9",
 ]
 
 [dependency-groups]

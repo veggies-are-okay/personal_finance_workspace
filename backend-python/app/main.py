@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.connections.router import router as connections_router
 from app.errors import register_exception_handlers
+from app.ingestion.router import router as ingest_router
 from app.routers import budget, debt, goals, investments, networth, transactions
 from app.schemas import HealthResponse
 
@@ -54,6 +55,12 @@ def create_app() -> FastAPI:
 
     # Connections API (P6.1): Plaid link/exchange/list + JWT-verified webhook.
     app.include_router(connections_router)
+
+    # Ingest API (P8.1): Python-OWNED upload/extract/load surface. Intentionally
+    # NOT mirrored in backend-ts and excluded from the read-parity contract
+    # (uses pdfplumber/PyYAML, like Alembic owns migrations) — see
+    # .claude/rules/backend-parity.md. The parity harness ignores /ingest/*.
+    app.include_router(ingest_router)
 
     return app
 
