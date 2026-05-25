@@ -39,6 +39,10 @@ Realizes DA-19 (re-import idempotency key) and the `api-data-pulls.md`
 
 ## Happy-path verification (dedupe proof)
 
+**Playwright screenshot** — the loader's happy path re-run on this branch (Postgres healthy → `alembic upgrade head` → all **14 loader tests pass**, incl. `test_double_load_is_idempotent`):
+
+![P3.1 loader happy-path proof](https://raw.githubusercontent.com/veggies-are-okay/personal_finance_workspace/51924969a1a68c3d5b5d3a0851e90e6c1c5ff70c/pull_requests/evidence/p3-1-load-ledger/proof.png)
+
 Ad-hoc script against the live Postgres (`docker compose up -d` + `alembic
 upgrade head`), loading the 4-row synthetic ledger **twice** in a rolled-back
 transaction:
