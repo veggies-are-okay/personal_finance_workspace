@@ -3,6 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
+import { CanonicalExceptionFilter } from './errors/canonical-exception.filter';
+import { canonicalValidationExceptionFactory } from './errors/validation-exception.factory';
 
 /**
  * Application bootstrap.
@@ -17,10 +19,15 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  // Canonical error envelope for EVERY error (DA-1/DA-18): the filter renders
+  // the one shared shape, and the ValidationPipe is forced to HTTP 422 with that
+  // shape (overriding NestJS's default 400) via the exception factory.
+  app.useGlobalFilters(new CanonicalExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
+      exceptionFactory: canonicalValidationExceptionFactory,
     }),
   );
 

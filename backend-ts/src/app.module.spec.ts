@@ -1,14 +1,15 @@
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getDataSourceToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import {
   AppModule,
   buildTypeOrmOptions,
   DEFAULT_DATABASE_URL,
+  resilientDataSourceFactory,
 } from './app.module';
-import { ALL_ENTITIES } from './entities/entities';
+import { ALL_ENTITIES, TransactionEntity } from './entities/entities';
 import { HealthController } from './health/health.controller';
 
 /**
@@ -61,6 +62,45 @@ describe('buildTypeOrmOptions', () => {
     const config = new ConfigService({});
     expect(buildTypeOrmOptions(config).synchronize).toBe(false);
   });
+
+  it('marks the connection for manual initialization (DA-18 boot resilience)', () => {
+    const config = new ConfigService({});
+    expect(
+      (buildTypeOrmOptions(config) as { manualInitialization?: boolean })
+        .manualInitialization,
+    ).toBe(true);
+  });
+});
+
+describe('resilientDataSourceFactory (DA-18)', () => {
+  it('returns the initialized DataSource on success', async () => {
+    // Real DataSource.initialize() resolves to `this`; emulate that.
+    const spy = jest
+      .spyOn(DataSource.prototype, 'initialize')
+      .mockImplementation(function (this: DataSource) {
+        return Promise.resolve(this);
+      });
+    const result = await resilientDataSourceFactory({
+      type: 'postgres',
+      url: DEFAULT_DATABASE_URL,
+    } as never);
+    expect(result).toBeInstanceOf(DataSource);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('returns the un-initialized DataSource when the DB is down (no throw)', async () => {
+    const spy = jest
+      .spyOn(DataSource.prototype, 'initialize')
+      .mockRejectedValue(new Error('ECONNREFUSED'));
+    const result = await resilientDataSourceFactory({
+      type: 'postgres',
+      url: 'postgresql://x:y@localhost:1/none',
+    } as never);
+    expect(result).toBeInstanceOf(DataSource);
+    expect(result.isInitialized).toBe(false);
+    spy.mockRestore();
+  });
 });
 
 describe('AppModule', () => {
@@ -75,6 +115,10 @@ describe('AppModule', () => {
     })
       .overrideProvider(getDataSourceToken())
       .useValue(fakeDataSource)
+      // The TransactionsModule's forFeature repo provider needs the DataSource's
+      // entity metadata; override it so the module boots without a live DB.
+      .overrideProvider(getRepositoryToken(TransactionEntity))
+      .useValue({})
       .compile();
 
     expect(moduleRef.get(HealthController)).toBeInstanceOf(HealthController);

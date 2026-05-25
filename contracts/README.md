@@ -53,6 +53,13 @@ body other than `{"status":"ok"}`), so a misconfigured port can't silently pass.
   structural-diff loop then asserts both backends match the canonical for every
   **implemented** operation (`IMPLEMENTED_PATHS`); **pending** operations are reported as
   skipped, and a guard asserts the canonical doc declares the complete frozen inventory.
+- **`test/transactions.parity.test.ts`** (P4.1) — value parity for
+  `GET /api/v1/transactions`. Seeds a synthetic fixture (`src/db.ts`) into the shared
+  Postgres, then asserts both backends return identical paginated bodies (money string,
+  dates `YYYY-MM-DD`, absent optionals omitted — DA-6), an identical canonical **422** on a
+  bad query (DA-1), an empty `data` + correct `total` for an offset past the end (DA-4),
+  and — against a second short-lived backend pair pointed at an unreachable DB — an
+  identical canonical **503** (DA-18).
 - **`test/endpoints.parity.stubs.test.ts`** — per-endpoint **value-parity stubs**
   (`it.todo`) for every not-yet-implemented view/source/connections endpoint; each names
   the concrete same-request→same-body / error / empty / degraded assertion a Stage-4 `BE`
@@ -105,10 +112,14 @@ backend running.
 
 Because the contract is frozen-and-complete but the backends implement it one `BE`
 branch at a time, `src/contract.ts` holds an **`IMPLEMENTED_PATHS`** allowlist of the
-operations that are LIVE in both backends today (only `GET /health` at P2.2). The
-structural-diff test scopes its strict cross-backend assertion to that set; **pending**
-operations are reported as `skip`/`todo` so the gate never fails just because the
-canonical doc lists a not-yet-built route.
+operations that are LIVE in both backends today (`GET /health` and, since P4.1,
+`GET /api/v1/transactions`). The structural-diff test scopes its strict cross-backend
+assertion to that set; **pending** operations are reported as `skip`/`todo` so the gate
+never fails just because the canonical doc lists a not-yet-built route.
+
+`src/db.ts` seeds/cleans a small **synthetic** fixture for value-parity tests that need a
+known DB state; `src/backends.ts#startDbDownBackends` boots a second pair against an
+unreachable DB so a degraded-state (503) parity case can be asserted (DA-18).
 
 ## Adding a new endpoint's parity test (Stage-4 `BE` branch)
 

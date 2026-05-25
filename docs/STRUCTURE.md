@@ -22,6 +22,8 @@
 
 > - 2026-05-24: **Precompute deterministic analytics** (P3.2). Added the `paystubs` income table — SQLAlchemy model (`backend-python/app/models.py`) + Alembic migration (`alembic/versions/ba4cb087cce7_*`) + mirrored TypeORM entity (`backend-ts/src/entities/entities.ts`, `PaystubEntity`); the schema-parity check + snapshots updated so `contracts/` stays green (DA-8). Added an idempotent income loader (`backend-python/app/ingestion/income_loader.py`, upsert on `sha256(employer, pay_date, gross_pay, net_pay)` — DA-19) and the **Python-only** precompute package (`backend-python/app/precompute/`: `categorize`, `rates`, `recurring`, `pipeline`) that reads `transactions` + `paystubs` → generic categorization + transfer/recurring detection + 50/30/20 buckets + savings/effective-tax rates (numeric 0–100, DA-22) and writes `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges` (every `/budget` field — DA-23). Golden-fixture tests assert exact aggregate values + determinism across runs (DA-9); both backends only READ these tables. — P3.2.
 
+> - 2026-05-24: **`GET /api/v1/transactions`** (P4.1) — the first real view endpoint, in **both** backends at parity. Python: `app/routers/transactions.py` (Pydantic query/response models, LEFT JOIN `accounts`, date/account/category/`q` filters, offset/limit `Paginated<T>` envelope) + `app/errors.py` (canonical error envelope; `RequestValidationError`→**422**, `ServiceUnavailableError`→**503**). TS: `src/transactions/` (controller + query DTO + TypeORM service) + `src/errors/` (global `CanonicalExceptionFilter` + `ValidationPipe` `exceptionFactory`→422); `app.module.ts` gained a resilient `dataSourceFactory` so a DB-down boot still serves `/health` and 503s DB routes (DA-18). Established reusable patterns: money decimal-string, dates `YYYY-MM-DD`, omit-absent (DA-6), canonical 422 (DA-1) / 503 (DA-18). Contracts: `test/transactions.parity.test.ts` (success / 422 / offset-past-end / DB-down 503) + `src/db.ts` (synthetic seed) + `startDbDownBackends`; `IMPLEMENTED_PATHS` now includes the path so the structural OpenAPI diff covers it. — P4.1.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -52,19 +54,26 @@ personal_finance/
 │   │                          #       idempotent pay stubs → paystubs upsert) ·
 │   │                          #     precompute/ (P3.2 Python-only analytics: categorize · rates · recurring ·
 │   │                          #       pipeline.run_precompute → budget_* aggregates + recurring_charges) ·
-│   │                          #     schemas.py (HealthResponse) · main.py (create_app, CORS, GET /health)
+│   │                          #     errors.py (P4.1 canonical error envelope; validation→422, DB-down→503) ·
+│   │                          #     routers/transactions.py (P4.1 GET /api/v1/transactions: filters + Paginated<T>) ·
+│   │                          #     schemas.py (HealthResponse + Transaction/Pagination/PaginatedTransactions/
+│   │                          #       TransactionQuery) · main.py (create_app, CORS, handlers, /health + tx router)
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
 │   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema · ba4cb087cce7_* = P3.2 paystubs
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
 │   └── tests/                 #   conftest (TestClient) + test_health/test_config/test_db (≥80% cov on app)
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python
 │   ├── src/                   #   main.ts (bootstrap: global ValidationPipe, Swagger → /openapi.json,
-│   │                          #     listens on TS_API_PORT) · app.module.ts (ConfigModule reads repo-root
-│   │                          #     .env, TypeOrmModule.forRootAsync postgres synchronize:false retryAttempts:0,
+│   │                          #     listens on TS_API_PORT; global CanonicalExceptionFilter + 422 ValidationPipe) ·
+│   │                          #     app.module.ts (ConfigModule reads repo-root .env, TypeOrmModule.forRootAsync
+│   │                          #     postgres synchronize:false + resilient dataSourceFactory (DA-18 boot),
 │   │                          #     entities: ALL_ENTITIES) · entities/ (entities.ts — TypeORM mirror of the
 │   │                          #     Alembic schema, P2.3 · schema-export.ts — normalized snapshot for parity) ·
+│   │                          #     errors/ (P4.1 canonical envelope: filter + validation factory → 422/503) ·
+│   │                          #     transactions/ (P4.1 controller + query DTO + TypeORM service) ·
 │   │                          #     health/ (module · controller · service · health-response.dto.ts + *.spec.ts)
-│   ├── test/                  #   health.e2e-spec.ts (Supertest; DataSource overridden → boots without a DB)
+│   ├── test/                  #   health.e2e-spec.ts · transactions.e2e-spec.ts (Supertest; DataSource + repo
+│   │                          #     overridden → boots without a DB; success/422/503 cases)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
@@ -73,13 +82,15 @@ personal_finance/
 │   │                          #     source + connections paths + /health; Appendix A baked in
 │   │                          #     (Money string, Percentage number, Error envelope, Pagination, enums)
 │   ├── redocly.yaml           #   redocly lint config (recommended ruleset, tuned for a local-first app)
-│   ├── src/                   #   backends.ts (spawn/poll/teardown both backends; rogue-:8000 guard) ·
-│   │                          #     global-setup.ts (Vitest globalSetup) · normalize.ts (OpenAPI
-│   │                          #     structural normalizer) · contract.ts (canonical loader +
-│   │                          #     IMPLEMENTED_PATHS allowlist) · schema.ts (run both schema exporters +
-│   │                          #     diff — the schema-parity check, DA-8) · http.ts
+│   ├── src/                   #   backends.ts (spawn/poll/teardown both backends; rogue-:8000 guard +
+│   │                          #     startDbDownBackends for the DA-18 503 case) · global-setup.ts
+│   │                          #     (Vitest globalSetup) · normalize.ts (OpenAPI structural normalizer) ·
+│   │                          #     contract.ts (canonical loader + IMPLEMENTED_PATHS allowlist) ·
+│   │                          #     schema.ts (schema-parity check, DA-8) · db.ts (synthetic seed for
+│   │                          #     value-parity, P4.1) · http.ts
 │   ├── test/                  #   health-response.parity · openapi.parity (structural diff, scoped to
 │   │                          #     implemented paths) · schema.parity (Alembic head ↔ TypeORM entities) ·
+│   │                          #     transactions.parity (P4.1: success/422/offset/503) ·
 │   │                          #     endpoints.parity.stubs (it.todo per endpoint) ·
 │   │                          #     normalize.unit · contract.unit · backends.unit · schema.unit
 │   ├── package.json           #   scripts: `test:parity` (canonical gate; pretest builds both backends) ·

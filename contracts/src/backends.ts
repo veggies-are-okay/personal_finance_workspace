@@ -25,6 +25,18 @@ export const TS_PORT = 3765;
 export const PY_BASE = `http://127.0.0.1:${PY_PORT}`;
 export const TS_BASE = `http://127.0.0.1:${TS_PORT}`;
 
+/** Separate ports for the short-lived DB-DOWN backend pair (DA-18 parity). */
+export const PY_DOWN_PORT = 8766;
+export const TS_DOWN_PORT = 3766;
+
+export const PY_DOWN_BASE = `http://127.0.0.1:${PY_DOWN_PORT}`;
+export const TS_DOWN_BASE = `http://127.0.0.1:${TS_DOWN_PORT}`;
+
+/** An unreachable Postgres URL: both backends boot (DB-independent /health) but
+ * any DB-backed request fails into the canonical 503 (DA-18). */
+export const UNREACHABLE_DATABASE_URL =
+  "postgresql://pf:pf@127.0.0.1:5499/does_not_exist";
+
 /** The one and only acceptable health body. Anything else fails loudly. */
 export const EXPECTED_HEALTH_BODY = { status: "ok" } as const;
 
@@ -38,28 +50,34 @@ function backendDir(...parts: string[]): string {
   return resolve(REPO_ROOT, ...parts);
 }
 
-/** Spawn FastAPI via uvicorn on PY_PORT (cwd = backend-python/). */
-export function spawnPython(): ChildProcess {
+/** Spawn FastAPI via uvicorn on the given port (cwd = backend-python/). */
+export function spawnPython(
+  port: number = PY_PORT,
+  extraEnv: NodeJS.ProcessEnv = {},
+): ChildProcess {
   return spawn(
     "uv",
-    ["run", "uvicorn", "app.main:app", "--port", String(PY_PORT)],
+    ["run", "uvicorn", "app.main:app", "--port", String(port)],
     {
       cwd: backendDir("backend-python"),
       stdio: "ignore",
       // Own process group so we can kill the whole tree (uv -> uvicorn).
       detached: true,
-      env: { ...process.env },
+      env: { ...process.env, ...extraEnv },
     },
   );
 }
 
-/** Spawn NestJS via `node dist/main.js` with TS_API_PORT (cwd = backend-ts/). */
-export function spawnNest(): ChildProcess {
+/** Spawn NestJS via `node dist/main.js` on the given port (cwd = backend-ts/). */
+export function spawnNest(
+  port: number = TS_PORT,
+  extraEnv: NodeJS.ProcessEnv = {},
+): ChildProcess {
   return spawn("node", ["dist/main.js"], {
     cwd: backendDir("backend-ts"),
     stdio: "ignore",
     detached: true,
-    env: { ...process.env, TS_API_PORT: String(TS_PORT) },
+    env: { ...process.env, TS_API_PORT: String(port), ...extraEnv },
   });
 }
 
@@ -147,6 +165,43 @@ export async function startBackends(): Promise<{
     name: "backend-ts (NestJS)",
     base: TS_BASE,
     proc: spawnNest(),
+  };
+
+  try {
+    await Promise.all([
+      waitForHealthy(python.name, python.base),
+      waitForHealthy(nest.name, nest.base),
+    ]);
+  } catch (err) {
+    killTree(python.proc);
+    killTree(nest.proc);
+    throw err;
+  }
+
+  return { python, nest };
+}
+
+/**
+ * Boot a SECOND, short-lived pair of backends pointed at an UNREACHABLE database
+ * (DA-18). Both still come up because `/health` is DB-independent (FastAPI's
+ * engine connects lazily; NestJS uses a resilient DataSource factory), so the
+ * caller can hit a DB-backed route on each and assert an identical canonical
+ * 503. Returns handles for the caller to tear down.
+ */
+export async function startDbDownBackends(): Promise<{
+  python: BackendHandle;
+  nest: BackendHandle;
+}> {
+  const env = { DATABASE_URL: UNREACHABLE_DATABASE_URL };
+  const python: BackendHandle = {
+    name: "backend-python (DB-down)",
+    base: PY_DOWN_BASE,
+    proc: spawnPython(PY_DOWN_PORT, env),
+  };
+  const nest: BackendHandle = {
+    name: "backend-ts (DB-down)",
+    base: TS_DOWN_BASE,
+    proc: spawnNest(TS_DOWN_PORT, env),
   };
 
   try {

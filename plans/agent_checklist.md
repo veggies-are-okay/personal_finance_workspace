@@ -59,9 +59,10 @@
 
 > Each P4 subsection is a `BE` vertical: implement the endpoint in **both** backends reading precomputed/normalized tables (no recompute), add a `contracts/` parity test, keep the OpenAPI diff clean. **Do not edit** `openapi.canonical.json`.
 
-### P4.1 — `GET /api/v1/transactions` (list/search/filter/paginate)  *(type: BE)*
-- [ ] Both backends; `Paginated<T>` envelope (Appendix A); filters by date/account/category.
+### P4.1 — `GET /api/v1/transactions` (list/search/filter/paginate)  *(type: BE)* — [x]
+- [x] Both backends; `Paginated<T>` envelope (Appendix A); filters by date/account/category.
   - *Verify:* Appendix B gates (PY+TS+FE-n/a) + `npm run test:parity` green; parity tests cover success, **invalid query → canonical 422** (DA-1), **offset past end → empty `data` + correct `total`** (DA-4), and **DB-unavailable → identical 503 canonical body** (DA-18); money is decimal-string, dates `Z`.
+  - *Done (2026-05-24):* FastAPI `app/routers/transactions.py` + `app/errors.py` (RequestValidationError→422, ServiceUnavailableError→503); NestJS `src/transactions/` + `src/errors/` (global filter + 422 ValidationPipe factory) + resilient `dataSourceFactory` so a DB-down boot still 503s (DA-18). Money decimal-string, dates `YYYY-MM-DD`, optionals omitted (DA-6). Established the reusable error/pagination patterns P4.2–P4.6 inherit. `contracts/test/transactions.parity.test.ts` covers DA-1/DA-4/DA-18 + success; `IMPLEMENTED_PATHS` adds the path (OpenAPI structural diff clean). Gates: Python 126 tests / 99% cov; TS 81 tests / 99.5% cov; parity 51 passed.
 ### P4.2 — `GET /api/v1/budget`  *(type: BE)*
 - [ ] Both backends read `budget_aggregates`/`recurring_charges` only.
   - *Verify:* Appendix B gates + parity; a **cross-backend identity** parity test asserts `/budget` is byte-identical from FastAPI and NestJS for a seeded DB (DA-9); percentages numeric, money decimal-string.
