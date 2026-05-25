@@ -236,3 +236,27 @@ export interface ExchangeResponse {
   item_id: string;
   status: ItemStatus;
 }
+
+// --- Ingest (Python-ONLY file upload; P8.1 backend) --------------------------
+// `POST /api/v1/ingest/{source}` is implemented only on the FastAPI backend
+// (ingestion is Python-owned, OUT of the 1:1 read-parity contract). nginx routes
+// this path to backend-python regardless of which frontend instance serves it.
+
+/** Data-source families that accept a raw-file upload via the ingest endpoint. */
+export type IngestSource = 'transactions' | 'income' | 'holdings' | 'accounts' | 'loans';
+
+/** Per-file detection result within an ingest summary. */
+export interface IngestedFile {
+  filename: string;
+  /** The format the backend detected (e.g. "chase_pdf", "amex", "etrade_csv"). */
+  detected_type: string;
+  /** Rows extracted from this file. */
+  rows: number;
+}
+
+/** `POST /api/v1/ingest/{source}` response: per-file detection + total loaded. */
+export interface IngestSummary {
+  source: string;
+  files: IngestedFile[];
+  total_rows: number;
+}

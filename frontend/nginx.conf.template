@@ -16,6 +16,27 @@ server {
     listen 80;
     server_name _;
 
+    # Allow PDF statement uploads (the backend caps each file at 25 MiB too).
+    client_max_body_size 25m;
+
+    # INGESTION IS PYTHON-ONLY. This MORE-SPECIFIC location matches before the
+    # general /api/ block below, so file uploads from BOTH frontend instances
+    # (8501 -> backend-python reads, 8502 -> backend-ts reads) are routed to
+    # backend-python regardless of ${BACKEND_UPSTREAM}. The NestJS backend does
+    # not implement /api/v1/ingest/* (see .claude/rules/backend-parity.md).
+    # The browser calls /api/api/v1/ingest/<source>; the trailing slash on
+    # proxy_pass strips the leading /api/ so the backend sees
+    # /api/v1/ingest/<source>. backend-python is resolvable on the compose
+    # network from both frontend services.
+    location /api/api/v1/ingest/ {
+        proxy_pass http://backend-python:8000/api/v1/ingest/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # Same-origin API proxy. proxy_pass ends in "/" so the matched "/api/"
     # location prefix is removed before forwarding:
     #   /api/health             -> ${BACKEND_UPSTREAM}/health

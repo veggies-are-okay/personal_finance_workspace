@@ -83,12 +83,45 @@ The **Settings** screen (`/settings`, `src/features/connections/`) reads
   `link_token` from the backend (Sandbox in CI; Trial locally) — no code change in
   the connections module is required.
 
+### File-upload onboarding — drop your raw files (P8.2)
+
+The Settings screen has a **per-source upload control** (`UploadControl`,
+`src/features/connections/`) so the owner can drop their raw statements/exports
+and have them flow through the backend ingest pipeline into the DB and on into
+the dashboards. There is one control per **ingest source**:
+
+| Source | `accept` | Multiple? | Powers |
+|--------|----------|-----------|--------|
+| `transactions` | `.csv,.pdf` | yes | Budget, spending, recurring |
+| `income` | `.pdf,.csv` | yes | savings rate, effective tax rate |
+| `holdings` | `.csv` | no | Investments allocation/concentration |
+| `accounts` | `.yaml,.yml` | no | Net Worth cash balances (standalone card; not a Plaid source) |
+| `loans` | `.csv` | no | Debt tranches + payoff |
+
+Each control is a labelled file picker that doubles as a **drag-and-drop** target;
+"Upload & ingest" → loading → **success** (per-file detected type + rows loaded,
+`role="status"`) or **error** (the canonical message, `role="alert"`). On success
+the screen invalidates its data (`useApi({ keepDataOnReload: true })` so the
+success summary survives the background refetch instead of remounting away).
+
+**Ingestion is Python-ONLY and always routes to the FastAPI backend.** The client
+POSTs `multipart/form-data` (files under the `file` field; the browser sets the
+boundary — we never set `Content-Type`) to `POST /api/v1/ingest/{source}`
+(`ingestSource()` in `src/lib/api.ts`). In Docker this is a same-origin
+`/api/api/v1/ingest/{source}` request, and `nginx.conf.template` has a
+**more-specific** `location /api/api/v1/ingest/` (before the general `/api/`)
+that proxies to `http://backend-python:8000` **regardless of which frontend
+instance served the SPA** — so uploads from `:8502` (the NestJS-reads instance)
+still hit FastAPI, because NestJS does not implement ingestion. The proxy also
+sets `client_max_body_size 25m` for PDF statements.
+
 ## Key files
 
 | Path | Role |
 |------|------|
-| `src/lib/api.ts` | The **single network boundary**: reads `VITE_API_BASE_URL` (absolute or relative `/api`); all fetches go through here. |
-| `Dockerfile` · `nginx.conf.template` | Multi-stage build → nginx SPA host + same-origin `/api` reverse proxy (one image, two compose instances). |
+| `src/lib/api.ts` | The **single network boundary**: reads `VITE_API_BASE_URL` (absolute or relative `/api`); all fetches go through here. Includes `ingestSource()` (multipart upload). |
+| `Dockerfile` · `nginx.conf.template` | Multi-stage build → nginx SPA host + same-origin `/api` reverse proxy (one image, two compose instances). Has a Python-only `/api/api/v1/ingest/` route + 25m body cap. |
+| `src/features/connections/UploadControl.tsx` | Per-source file-upload control (drag-or-pick) that drives the Python-only ingest endpoint and renders loading/success/error. |
 | `src/lib/types.ts` | Wire types mirroring the canonical contract (Appendix A). |
 | `src/lib/useApi.ts` | The shared async state machine: `loading` / `success` / `error` / `not_connected`. |
 | `src/lib/format.ts` | Money-string + percentage-number display helpers. |

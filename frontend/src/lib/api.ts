@@ -17,6 +17,8 @@ import type {
   ExchangeRequest,
   ExchangeResponse,
   Goals,
+  IngestSource,
+  IngestSummary,
   Investments,
   LinkTokenCreateRequest,
   LinkTokenResponse,
@@ -233,4 +235,54 @@ export function setSourceMode(
   mode: SourceMode,
 ): Promise<ConnectionsList> {
   return postJson<ConnectionsList>('/api/v1/connections/source-mode', { source, mode });
+}
+
+// --- Ingest (Python-ONLY multipart upload; P8.1 backend) ---------------------
+
+/**
+ * Upload raw file(s) for a `source` to `POST /api/v1/ingest/{source}` and parse
+ * the `{ source, files, total_rows }` summary.
+ *
+ * Sends a `multipart/form-data` body where every file is appended under the
+ * `file` field (the backend's `UploadFile` param). We deliberately DO NOT set a
+ * `Content-Type` header — the browser must set it so the multipart boundary is
+ * generated correctly; setting it by hand breaks the upload.
+ *
+ * In Docker this resolves to a same-origin `/api/api/v1/ingest/{source}` request
+ * that nginx routes to the Python backend regardless of which frontend instance
+ * served the SPA (ingestion is Python-only).
+ *
+ * @throws {ApiRequestError} on non-2xx, with the canonical error envelope as
+ *   `.body` when present (422 bad/empty/unknown input, 503 DB unavailable).
+ */
+export async function ingestSource(
+  source: IngestSource,
+  files: readonly File[],
+): Promise<IngestSummary> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append('file', file, file.name);
+  }
+
+  // No Content-Type header: the browser sets multipart/form-data + boundary.
+  const response = await fetch(buildUrl(`/api/v1/ingest/${source}`), {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: form,
+  });
+
+  if (!response.ok) {
+    let error: ApiError | undefined;
+    try {
+      error = (await response.json()) as ApiError;
+    } catch {
+      error = undefined;
+    }
+    const message =
+      error?.error?.message ??
+      `Upload to ${source} failed (HTTP ${response.status}).`;
+    throw new ApiRequestError(response.status, message, error);
+  }
+
+  return (await response.json()) as IngestSummary;
 }

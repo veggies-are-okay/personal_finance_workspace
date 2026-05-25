@@ -105,4 +105,42 @@ export const handlers = [
       ),
     });
   }),
+
+  // --- Ingest (Python-only P8.1; mocked so the upload UI is demoable in dev) --
+  // Reads the multipart body and echoes a per-file summary. `?scenario=error`
+  // returns the canonical 422 a bad/empty/unknown upload would produce.
+  http.post(`${apiBaseUrl}/api/v1/ingest/:source`, async ({ params, request }) => {
+    if (scenarioOf(request) === 'error') {
+      return HttpResponse.json(
+        {
+          error: {
+            code: 'UNPROCESSABLE_ENTITY',
+            message: 'Could not detect a known bank format for the uploaded file.',
+            details: [],
+          },
+        },
+        { status: 422 },
+      );
+    }
+    const source = String(params.source);
+    const form = await request.formData();
+    const uploaded = form.getAll('file').filter((f): f is File => f instanceof File);
+    const detected = INGEST_DETECTED_TYPE[source] ?? 'detected';
+    const files = uploaded.map((f, i) => ({
+      filename: f.name,
+      detected_type: detected,
+      rows: 12 + i,
+    }));
+    const total_rows = files.reduce((sum, f) => sum + f.rows, 0);
+    return HttpResponse.json({ source, files, total_rows });
+  }),
 ];
+
+/** Synthetic detected-type per ingest source, mirroring the backend's labels. */
+const INGEST_DETECTED_TYPE: Record<string, string> = {
+  transactions: 'amex',
+  income: 'paystubs_csv',
+  holdings: 'etrade_csv',
+  accounts: 'accounts_yaml',
+  loans: 'loan_csv',
+};

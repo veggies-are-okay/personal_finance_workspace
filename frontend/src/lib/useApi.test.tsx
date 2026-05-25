@@ -47,4 +47,43 @@ describe('useApi', () => {
     await waitFor(() => expect(result.current.phase).toBe('success'));
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it('keepDataOnReload: a reload after success keeps phase/data, no loading flash', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({ n: 1 })
+      .mockResolvedValueOnce({ n: 2 });
+
+    const { result } = renderHook(() =>
+      useApi(fetcher, [], { keepDataOnReload: true }),
+    );
+    await waitFor(() => expect(result.current.phase).toBe('success'));
+
+    act(() => result.current.reload());
+    // Synchronously after reload it must STILL be 'success' (not 'loading'),
+    // and keep the prior data on screen so the subtree is not remounted.
+    expect(result.current.phase).toBe('success');
+    expect(result.current.data).toEqual({ n: 1 });
+
+    await waitFor(() => expect(result.current.data).toEqual({ n: 2 }));
+    expect(result.current.phase).toBe('success');
+  });
+
+  it('without keepDataOnReload, a reload flashes the loading state', async () => {
+    let resolveSecond: (v: unknown) => void = () => {};
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({ n: 1 })
+      .mockImplementationOnce(() => new Promise((r) => (resolveSecond = r)));
+
+    const { result } = renderHook(() => useApi(fetcher));
+    await waitFor(() => expect(result.current.phase).toBe('success'));
+
+    act(() => result.current.reload());
+    // The default behavior resets to loading while the refetch is in flight.
+    expect(result.current.phase).toBe('loading');
+
+    act(() => resolveSecond({ n: 2 }));
+    await waitFor(() => expect(result.current.phase).toBe('success'));
+  });
 });

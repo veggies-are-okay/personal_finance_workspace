@@ -1,0 +1,39 @@
+# EPHEMERAL override for the ISOLATED P8.2 end-to-end ingest test ONLY.
+# Used as: docker compose -p pf_p82 -f docker-compose.yml -f docker-compose.p82.override.yml up --build -d
+#
+# Why this exists:
+#   The default `personal_finance` compose stack is RUNNING and holds host ports
+#   8501/8502/5433 and the `pf_pgdata` volume that contains the owner's REAL
+#   data. We must never disturb it. Running under a separate project name
+#   (`-p pf_p82`) gives Docker a SEPARATE, namespaced volume
+#   (`pf_p82_pf_pgdata`) — the real data is untouched. This override only
+#   remaps the published host ports to free ones so the isolated stack can come
+#   up alongside the default one.
+#
+# Tear down with:  docker compose -p pf_p82 -f docker-compose.yml -f docker-compose.p82.override.yml down -v
+# (This file is committed so the verification is reproducible; it is NOT wired
+#  into the default stack.)
+
+# The base file hardcodes container_name: pf_* which collide with the running
+# default stack, so we rename every service's container under a _p82 suffix.
+# `!override` REPLACES the base ports list (compose merges lists by default,
+# which would keep the conflicting 5433/8501/8502 bindings from the base file).
+services:
+  postgres:
+    container_name: pf_p82_postgres
+    ports: !override
+      - "5443:5432"
+  migrate:
+    container_name: pf_p82_migrate
+  backend-python:
+    container_name: pf_p82_backend_python
+  backend-ts:
+    container_name: pf_p82_backend_ts
+  frontend-python:
+    container_name: pf_p82_frontend_python
+    ports: !override
+      - "8511:80"
+  frontend-ts:
+    container_name: pf_p82_frontend_ts
+    ports: !override
+      - "8512:80"
