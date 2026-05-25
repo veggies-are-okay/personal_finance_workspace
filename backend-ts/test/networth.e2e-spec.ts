@@ -13,6 +13,9 @@ import {
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  GoalEntity,
+  HoldingEntity,
+  LoanEntity,
   RecurringChargeEntity,
   TransactionEntity,
 } from '../src/entities/entities';
@@ -77,6 +80,12 @@ describe('NetWorthController (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(AccountEntity))
       .useValue(accountRepo)
+      .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(LoanEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();

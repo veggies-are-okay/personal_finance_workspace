@@ -8,10 +8,13 @@ import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
 import {
+  AccountEntity,
   BudgetAggregateEntity,
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  GoalEntity,
+  HoldingEntity,
   LoanEntity,
   RecurringChargeEntity,
   TransactionEntity,
@@ -86,6 +89,12 @@ describe('DebtController (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(LoanEntity))
       .useValue(loanRepo)
+      .overrideProvider(getRepositoryToken(AccountEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(HoldingEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(GoalEntity))
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();
