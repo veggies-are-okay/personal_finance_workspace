@@ -82,7 +82,7 @@
 
 ## P5 — Frontend (built against the mock, then wired)
 ### P5.1 — App shell + core screens  *(type: FE — `FE/core-screens`)*
-- [ ] Sidebar nav + routing + theme; Story/Budget/Net Worth/Investments/Debt/Goals rendering from the view endpoints — **mock generated from `openapi.canonical.json`** first, then `VITE_API_BASE_URL` (DA-21). Loading / empty / error states per screen (incl. `not_connected` empty state — DA-20). Mirrors `pencil/website_wire.pen`.
+- [x] Sidebar nav + routing + theme; Story/Budget/Net Worth/Investments/Debt/Goals rendering from the view endpoints — **mock generated from `openapi.canonical.json`** first, then `VITE_API_BASE_URL` (DA-21). Loading / empty / error states per screen (incl. `not_connected` empty state — DA-20). Mirrors `pencil/website_wire.pen`.
   - *Verify:* frontend gate (Appendix B) incl. ≥80% coverage + `build`; Playwright check against the mock; a **wiring smoke run** against one live backend after P4 merges (DA-21).
 ### P5.2 — Settings/Data Sources + Plaid Link module  *(type: FE — `FE/settings-connections`)*
 - [ ] Settings reads `GET /api/v1/connections` (per-source `mode`/`item_status`); isolated `features/connections/` module embeds `react-plaid-link` (link-token → public_token → exchange). Renders `connected`/`needs_reauth`/`error`/`not_connected` states with a **Reconnect** CTA (update mode — DA-13). Local↔API toggle calls the connections API.

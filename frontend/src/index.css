@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+/*
+ * Throughline theme tokens (Tailwind v4 @theme).
+ * Semantic roles map to the wireframe palette: a teal "brand" accent on a
+ * calm slate neutral scale. Dark mode is class-based (`.dark` on <html>).
+ */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #ecfdf6;
+  --color-brand-100: #d1fae8;
+  --color-brand-200: #a7f3d4;
+  --color-brand-300: #6ee7bb;
+  --color-brand-400: #34d39e;
+  --color-brand-500: #14b886;
+  --color-brand-600: #0d9469;
+  --color-brand-700: #0f7657;
+  --color-brand-800: #115e47;
+  --color-brand-900: #134e3b;
+}
+
+/* Respect reduced-motion preferences globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

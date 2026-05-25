@@ -12,7 +12,7 @@ const reactHooksRecommendedRules =
   reactHooks.configs['recommended-latest'].rules;
 
 export default tseslint.config([
-  globalIgnores(['dist', 'coverage']),
+  globalIgnores(['dist', 'coverage', 'public/mockServiceWorker.js']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
