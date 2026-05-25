@@ -2,11 +2,12 @@ import type { Server } from 'node:http';
 
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getDataSourceToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
+import { TransactionEntity } from '../src/entities/entities';
 
 /**
  * E2E contract for the canonical `GET /health` (mirrors the FastAPI test in
@@ -33,6 +34,10 @@ describe('HealthController (e2e)', () => {
     })
       .overrideProvider(getDataSourceToken())
       .useValue(fakeDataSource)
+      // The TransactionsModule's forFeature repo provider needs DataSource entity
+      // metadata; override it so the DB-independent /health app still boots.
+      .overrideProvider(getRepositoryToken(TransactionEntity))
+      .useValue({})
       .compile();
 
     app = moduleFixture.createNestApplication();

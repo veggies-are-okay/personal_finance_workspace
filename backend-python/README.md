@@ -21,9 +21,11 @@ uv run ruff check . && uv run ruff format --check . && \
 
 | Path | Role |
 |------|------|
-| `app/main.py` | `create_app`, CORS, routers (`GET /health` today; view/source/connections routes per the checklist). |
+| `app/main.py` | `create_app`, CORS, canonical exception handlers, routers (`GET /health`, `GET /api/v1/transactions`; more view/source/connections routes per the checklist). |
 | `app/config.py` | Settings via `pydantic-settings` (reads repo-root `.env`). |
 | `app/db.py` | SQLAlchemy 2.0 engine/session/`Base`/`get_db` (psycopg3). |
+| `app/errors.py` | **Canonical error envelope + handlers (P4.1, DA-1/DA-18):** maps `RequestValidationError` → **422** and `ServiceUnavailableError` → **503**, both in the one `{"error":{code,message,details[]}}` shape NestJS also emits. Registered by `create_app`; every view router inherits it. |
+| `app/routers/transactions.py` | **`GET /api/v1/transactions` (P4.1):** thin read of `transactions` (LEFT JOIN `accounts` for the name) with date/account/category/`q` filters + offset/limit pagination → the `Paginated<T>` envelope. Money decimal-string, dates `YYYY-MM-DD`; DB failure → canonical 503. |
 | `app/models.py` | SQLAlchemy 2.0 ORM models — the **canonical schema** (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`, `plaid_items` (token `BYTEA`), `source_config`, and the P3.2 `paystubs` income table. |
 | `app/schema_export.py` | Dumps a normalized schema snapshot (`python -m app.schema_export`) for the cross-backend schema-parity check (DA-8). |
 | `app/ingestion/loader.py` | **Idempotent ledger loader (P3.1):** upserts the normalized signed-amount ledger into `transactions` on the unique `dedupe_key` (`sha256(account, date, signed_amount, normalized_description)` — DA-19). Re-import is an upsert, not a duplicate. Money is `Decimal`. Consumes the rows `scripts/ledger.py` emits. |

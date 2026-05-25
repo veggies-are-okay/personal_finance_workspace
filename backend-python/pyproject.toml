@@ -32,3 +32,6 @@ line-length = 100
 addopts = "--cov=app --cov-report=term-missing:skip-covered --cov-branch --cov-fail-under=80"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "slow: tests that round-trip a real database (run by default; skipped with --fast)",
+]

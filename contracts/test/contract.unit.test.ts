@@ -2,10 +2,11 @@
  * Unit tests for the canonical-contract loader + implemented-paths allowlist.
  *
  * Run WITHOUT booting the backends (pure reads of openapi.canonical.json). They
- * pin the P2.2 invariants the parity gate relies on:
+ * pin the invariants the parity gate relies on:
  *   - the canonical doc loads and declares the COMPLETE frozen path inventory
  *     (DA-25): all view + source + connections operations,
- *   - exactly /health is implemented at P2.2 time,
+ *   - the implemented allowlist grows ONLY by appending live endpoints (here
+ *     /health + the P4.1 transactions endpoint) — the canonical doc stays frozen,
  *   - the partition (implemented vs pending) is consistent with the inventory,
  *   - Appendix A wire conventions are baked into the reusable components
  *     (money = string w/ 2dp pattern; percentage = number 0-100; the enum
@@ -47,16 +48,21 @@ describe("canonical contract — frozen path inventory (P2.2 / DA-25)", () => {
     expect(canonicalOperationKeys(doc)).toEqual(EXPECTED_INVENTORY);
   });
 
-  it("implements exactly /health at P2.2 time", () => {
-    expect([...IMPLEMENTED_PATHS]).toEqual([opKey("GET", "/health")]);
+  it("implements /health and the P4.1 transactions endpoint", () => {
+    expect([...IMPLEMENTED_PATHS].sort()).toEqual(
+      [opKey("GET", "/health"), opKey("GET", "/api/v1/transactions")].sort(),
+    );
   });
 
   it("partitions implemented vs pending consistently", () => {
     const doc = loadCanonical();
     const { implemented, pending } = partitionOperations(doc);
-    expect(implemented).toEqual([opKey("GET", "/health")]);
-    expect(pending).toContain(opKey("GET", "/api/v1/transactions"));
+    expect(implemented.sort()).toEqual(
+      [opKey("GET", "/health"), opKey("GET", "/api/v1/transactions")].sort(),
+    );
+    // A not-yet-built endpoint remains pending (e.g. the webhook).
     expect(pending).toContain(opKey("POST", "/api/v1/connections/webhook"));
+    expect(pending).not.toContain(opKey("GET", "/api/v1/transactions"));
     expect([...implemented, ...pending].sort()).toEqual(EXPECTED_INVENTORY);
   });
 });

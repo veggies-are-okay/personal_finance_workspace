@@ -50,8 +50,8 @@ export function opKey(method: string, path: string): OperationKey {
 export const IMPLEMENTED_PATHS: ReadonlySet<OperationKey> =
   new Set<OperationKey>([
     opKey("GET", "/health"),
+    opKey("GET", "/api/v1/transactions"), // P4.1
     // Stage-4 branches append as they implement (DA-25 keeps the OpenAPI frozen):
-    // opKey("GET", "/api/v1/transactions"),
     // opKey("GET", "/api/v1/budget"),
     // opKey("GET", "/api/v1/networth"),
     // opKey("GET", "/api/v1/investments"),

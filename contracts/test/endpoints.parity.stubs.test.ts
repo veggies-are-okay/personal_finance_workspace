@@ -25,19 +25,9 @@
 import { describe, it } from "vitest";
 
 describe("view endpoints — value parity (TODO: Stage-4 BE branches)", () => {
-  // P4.1 — GET /api/v1/transactions
-  it.todo(
-    "GET /api/v1/transactions: identical paginated bodies; money decimal-string; dates YYYY-MM-DD",
-  );
-  it.todo(
-    "GET /api/v1/transactions: invalid query (limit > 200) -> identical canonical 422 body (DA-1)",
-  );
-  it.todo(
-    "GET /api/v1/transactions: offset past end -> empty data + correct total, identical (DA-4)",
-  );
-  it.todo(
-    "GET /api/v1/transactions: DB unavailable -> identical 503 canonical body (DA-18)",
-  );
+  // P4.1 — GET /api/v1/transactions: IMPLEMENTED. The success / invalid-422 /
+  // offset-past-end / DB-down-503 value-parity assertions live in their own file
+  // (test/transactions.parity.test.ts), per the P4.1 branch convention.
 
   // P4.2 — GET /api/v1/budget
   it.todo(

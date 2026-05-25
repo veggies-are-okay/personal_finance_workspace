@@ -11,6 +11,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.errors import register_exception_handlers
+from app.routers import transactions
 from app.schemas import HealthResponse
 
 # Frontend dev origins (Vite). CORS is wired now so later UI work just works.
@@ -33,10 +35,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Canonical error envelope: validation -> 422, DB-unavailable -> 503 (DA-1/DA-18).
+    register_exception_handlers(app)
+
     @app.get("/health", response_model=HealthResponse, status_code=200)
     def health() -> HealthResponse:
         """Liveness probe. Always ``{"status": "ok"}``; never touches the DB."""
         return HealthResponse(status="ok")
+
+    # View endpoints (read precomputed/normalized tables; no recompute).
+    app.include_router(transactions.router)
 
     return app
 
