@@ -15,6 +15,10 @@ from alembic import context
 from app.db import Base, _normalize_url
 from app.config import get_settings
 
+# Import the ORM models so their tables register on ``Base.metadata`` and
+# Alembic autogenerate/`alembic check` sees the full canonical schema (P2.3).
+import app.models  # noqa: F401  (side-effecting import: registers tables)
+
 # Alembic Config object (access to alembic.ini values).
 config = context.config
 

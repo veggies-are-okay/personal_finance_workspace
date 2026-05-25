@@ -24,8 +24,10 @@ uv run ruff check . && uv run ruff format --check . && \
 | `app/main.py` | `create_app`, CORS, routers (`GET /health` today; view/source/connections routes per the checklist). |
 | `app/config.py` | Settings via `pydantic-settings` (reads repo-root `.env`). |
 | `app/db.py` | SQLAlchemy 2.0 engine/session/`Base`/`get_db` (psycopg3). |
+| `app/models.py` | SQLAlchemy 2.0 ORM models — the **canonical schema** (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`, `plaid_items` (token `BYTEA`), `source_config`. |
+| `app/schema_export.py` | Dumps a normalized schema snapshot (`python -m app.schema_export`) for the cross-backend schema-parity check (DA-8). |
 | `app/schemas.py` | Pydantic v2 response/request models (must match the canonical OpenAPI). |
-| `alembic/` | Migrations — the **canonical schema source**; `versions/` grows from P2.3. |
+| `alembic/` | Migrations — the **canonical schema source**; `versions/f0bda61fcf45_*` is the P2.3 initial schema. |
 
 ## How it fits
 
@@ -34,3 +36,4 @@ Serves **thin reads** of tables the ingestion pipeline (`scripts/`) precomputes 
 **Gotchas:**
 - This is one of **two uv projects** — run these commands from `backend-python/` (the repo root is the *ingestion* uv project).
 - **Money is `Decimal` → serialized as a decimal string** on the wire; **datetimes are ISO-8601 UTC `Z`**; validation errors use the canonical **422** envelope (contract Appendix A). Keep Alembic and the TypeORM entities in lockstep (`synchronize:false`).
+- **Schema column types** (Appendix A): money `NUMERIC(14,2)`, percentages bare `NUMERIC`, datetimes `timestamptz`, enums `TEXT` + `CHECK`, the Plaid `access_token` is `BYTEA` (ciphertext — never plaintext). Importing `app.models` registers tables on `Base.metadata`; `alembic check` must report no drift between the models and the migration.

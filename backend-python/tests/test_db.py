@@ -31,9 +31,12 @@ def test_engine_uses_psycopg_driver() -> None:
     assert engine.url.drivername == "postgresql+psycopg"
 
 
-def test_base_metadata_is_empty_for_now() -> None:
-    # Schema lands in P2.1; no tables registered yet.
-    assert Base.metadata.tables == {}
+def test_base_metadata_registers_models() -> None:
+    # P2.3 added the schema: importing app.models registers tables on Base.
+    import app.models  # noqa: F401  (side-effecting import registers tables)
+
+    assert "transactions" in Base.metadata.tables
+    assert "plaid_items" in Base.metadata.tables
 
 
 def test_get_db_yields_and_closes_session() -> None:

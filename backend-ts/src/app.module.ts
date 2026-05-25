@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 
+import { ALL_ENTITIES } from './entities/entities';
 import { HealthModule } from './health/health.module';
 
 // The shared `.env` lives at the repo root (two levels up from this file:
@@ -20,7 +21,9 @@ export const DEFAULT_DATABASE_URL =
  * Mirrors the Python backend's DB wiring intent:
  * - Alembic (backend-python) owns the schema, so `synchronize: false` — TypeORM
  *   never auto-syncs the schema out from under Alembic.
- * - `entities: []` for now; the schema (and entities) arrive in P2.1.
+ * - `entities: ALL_ENTITIES` mirror the Alembic-owned schema (P2.3). They are
+ *   registered for metadata only; `synchronize: false` means TypeORM never
+ *   creates or alters tables.
  * - `retryAttempts: 0` so app/test startup never blocks on an unavailable DB.
  *   `/health` is DB-independent and the e2e suite must boot without Postgres.
  *
@@ -33,8 +36,7 @@ export function buildTypeOrmOptions(
     type: 'postgres',
     url: config.get<string>('DATABASE_URL', DEFAULT_DATABASE_URL),
     synchronize: false,
-    entities: [],
-    autoLoadEntities: true,
+    entities: ALL_ENTITIES,
     retryAttempts: 0,
   };
 }
