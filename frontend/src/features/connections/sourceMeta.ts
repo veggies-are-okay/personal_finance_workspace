@@ -10,7 +10,7 @@
  */
 
 import type { BadgeTone } from '../../components/Badge';
-import type { ItemStatus, PlaidProduct, Source } from '../../lib/types';
+import type { IngestSource, ItemStatus, PlaidProduct, Source } from '../../lib/types';
 
 export interface SourceMeta {
   label: string;
@@ -77,4 +77,75 @@ export const STATUS_META: Record<ItemStatus, StatusMeta> = {
   error: { label: 'Sync error', tone: 'warn', affordance: 'reconnect' },
   disconnected: { label: 'Disconnected', tone: 'neutral', affordance: 'connect' },
   not_connected: { label: 'Not connected', tone: 'neutral', affordance: 'connect' },
+};
+
+// --- File-upload metadata (P8.2; Python-only ingest) -------------------------
+// Each entry drives one upload control: the `<input accept>` filter, whether
+// multiple files are allowed, and a copy hint. The label/purpose come from
+// SOURCE_META where the source is also a connections source; `accounts` is
+// upload-only (it powers Net Worth via a YAML snapshot, not a Plaid product).
+
+export interface UploadMeta {
+  /** Human label for this upload control. */
+  label: string;
+  /** What the uploaded file powers, shown under the control. */
+  purpose: string;
+  /** `accept` attribute for the file input (extensions the backend handles). */
+  accept: string;
+  /** Whether multiple files may be selected and ingested in one request. */
+  multiple: boolean;
+  /** Short hint describing the expected file(s). */
+  hint: string;
+}
+
+export const UPLOAD_META: Record<IngestSource, UploadMeta> = {
+  transactions: {
+    label: 'Bank & card transactions',
+    purpose: 'Loads Budget, spending, and recurring charges.',
+    accept: '.csv,.pdf',
+    multiple: true,
+    hint: 'Drop bank/card CSV exports and Chase PDF statements (multiple allowed).',
+  },
+  income: {
+    label: 'Pay stubs & income',
+    purpose: 'Loads savings rate and effective tax rate.',
+    accept: '.pdf,.csv',
+    multiple: true,
+    hint: 'Drop pay-stub PDF(s) or a paystubs.csv (multiple allowed).',
+  },
+  holdings: {
+    label: 'Brokerage holdings',
+    purpose: 'Loads Investments allocation and concentration.',
+    accept: '.csv',
+    multiple: false,
+    hint: 'Drop an E*TRADE positions CSV.',
+  },
+  accounts: {
+    label: 'Account balances',
+    purpose: 'Loads cash & account balances into Net Worth.',
+    accept: '.yaml,.yml',
+    multiple: false,
+    hint: 'Drop an accounts.yaml snapshot.',
+  },
+  loans: {
+    label: 'Student loans',
+    purpose: 'Loads Debt tranches and payoff projections.',
+    accept: '.csv',
+    multiple: false,
+    hint: 'Drop a loan balances CSV.',
+  },
+};
+
+/**
+ * Map a connections `Source` to its ingest `Source`, or `null` when the source
+ * has no file-upload path (e.g. `listings` — a manual target, no ingest route).
+ * Note `accounts` is an ingest source with no connections row, so it is offered
+ * as a standalone upload card rather than mapped here.
+ */
+export const SOURCE_TO_INGEST: Record<Source, IngestSource | null> = {
+  transactions: 'transactions',
+  income: 'income',
+  holdings: 'holdings',
+  loans: 'loans',
+  listings: null,
 };

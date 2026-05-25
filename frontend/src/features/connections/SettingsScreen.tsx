@@ -20,11 +20,17 @@ import { ScreenState } from '../../components/ScreenState';
 import { getConnections } from '../../lib/api';
 import type { ConnectionItem, ConnectionsList } from '../../lib/types';
 import { useApi } from '../../lib/useApi';
-import { SOURCE_META, STATUS_META } from './sourceMeta';
+import { SOURCE_META, STATUS_META, UPLOAD_META } from './sourceMeta';
 import { SourceCard } from './SourceCard';
+import { UploadControl } from './UploadControl';
 
 export function SettingsScreen() {
-  const state = useApi<ConnectionsList>(() => getConnections(), []);
+  // `keepDataOnReload` so an upload's success summary survives the invalidation
+  // refetch (a child UploadControl calls `onIngested` -> reload; without this
+  // the subtree would remount and the "loaded N rows" message would vanish).
+  const state = useApi<ConnectionsList>(() => getConnections(), [], {
+    keepDataOnReload: true,
+  });
 
   return (
     <>
@@ -81,8 +87,25 @@ function ConnectionsBody({
         ))}
       </section>
 
+      <AccountsUploadCard onChanged={onChanged} />
+
       <LinkedItems items={connections.items} />
     </div>
+  );
+}
+
+/**
+ * `accounts` is an ingest source (an `accounts.yaml` snapshot powering Net
+ * Worth) with no Plaid/connections row, so it gets a standalone upload card
+ * rather than a `SourceCard`.
+ */
+function AccountsUploadCard({ onChanged }: { onChanged: () => void }) {
+  const meta = UPLOAD_META.accounts;
+  return (
+    <Panel title={meta.label}>
+      <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">{meta.purpose}</p>
+      <UploadControl source="accounts" onIngested={onChanged} />
+    </Panel>
   );
 }
 

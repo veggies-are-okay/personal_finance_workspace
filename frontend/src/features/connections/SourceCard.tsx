@@ -11,7 +11,8 @@ import { Card } from '../../components/Card';
 import type { SourceConnection } from '../../lib/types';
 import { ConnectButton } from './ConnectButton';
 import { ModeToggle } from './ModeToggle';
-import { SOURCE_META, STATUS_META } from './sourceMeta';
+import { SOURCE_META, SOURCE_TO_INGEST, STATUS_META } from './sourceMeta';
+import { UploadControl } from './UploadControl';
 
 export function SourceCard({
   connection,
@@ -23,6 +24,7 @@ export function SourceCard({
 }) {
   const meta = SOURCE_META[connection.source];
   const status = STATUS_META[connection.status];
+  const ingestSource = SOURCE_TO_INGEST[connection.source];
 
   return (
     <Card className="flex flex-col gap-4">
@@ -70,6 +72,15 @@ export function SourceCard({
           </dd>
         </div>
       </dl>
+
+      {ingestSource && (
+        <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+          <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Upload a file
+          </h4>
+          <UploadControl source={ingestSource} onIngested={onChanged} />
+        </div>
+      )}
     </Card>
   );
 }

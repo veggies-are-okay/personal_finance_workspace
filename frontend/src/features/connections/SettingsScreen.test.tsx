@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { apiBaseUrl } from '../../lib/api';
 import { server } from '../../mocks/server';
@@ -104,6 +104,58 @@ describe('SettingsScreen', () => {
     const localRadios = screen.getAllByRole('radio', { name: /live api/i });
     await user.click(localRadios[localRadios.length - 1]);
 
+    await waitFor(() => expect(getCount).toBe(2));
+  });
+
+  it('renders an upload control per ingest source, including a standalone accounts card', async () => {
+    renderWithProviders(<SettingsScreen />);
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument(),
+    );
+
+    // transactions, income (multiple) -> "Choose files"; holdings, loans,
+    // accounts (single) -> "Choose file". 2 multi + 3 single = 5 controls,
+    // proving every ingest source (incl. accounts, which has no Plaid row) has
+    // an upload affordance and listings (no ingest route) does not.
+    const choosers = screen.getAllByLabelText(/choose files?/i);
+    expect(choosers).toHaveLength(5);
+
+    // The accounts upload is its own panel (it powers Net Worth via YAML).
+    expect(
+      screen.getByRole('heading', { name: /account balances/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('refetches the connections snapshot after a successful upload (invalidation)', async () => {
+    const user = userEvent.setup();
+    let getCount = 0;
+    server.use(
+      http.get(CONNECTIONS_URL, () => {
+        getCount += 1;
+        return HttpResponse.json(connectionsFixture);
+      }),
+      http.post(`${apiBaseUrl}/api/v1/ingest/:source`, ({ params }) =>
+        HttpResponse.json({
+          source: String(params.source),
+          files: [{ filename: 'holdings.csv', detected_type: 'etrade_csv', rows: 3 }],
+          total_rows: 3,
+        }),
+      ),
+    );
+
+    renderWithProviders(<SettingsScreen />);
+    await waitFor(() => expect(getCount).toBe(1));
+
+    // Upload to the brokerage-holdings card (single-file picker). Scope the
+    // submit button to the same control so we click the matching one.
+    const file = new File(['Symbol,Qty\n'], 'holdings.csv', { type: 'text/csv' });
+    const holdingsInput = screen.getAllByLabelText(/choose file$/i)[0];
+    await user.upload(holdingsInput, file);
+    const control = holdingsInput.closest('div.flex.flex-col.gap-2') as HTMLElement;
+    const { getByRole } = within(control);
+    await user.click(getByRole('button', { name: /upload & ingest/i }));
+
+    // A successful ingest invalidates the snapshot -> a second GET.
     await waitFor(() => expect(getCount).toBe(2));
   });
 

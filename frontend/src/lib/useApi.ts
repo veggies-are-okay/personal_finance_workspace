@@ -34,6 +34,14 @@ export interface UseApiOptions<T> {
    * not-connected empty state instead of `success`.
    */
   isEmpty?: (data: T) => boolean;
+  /**
+   * When true, a `reload()` keeps the currently-rendered data visible while the
+   * refetch is in flight instead of flashing the loading state. This avoids
+   * remounting the subtree on a background refresh — e.g. so a child's
+   * just-shown "uploaded N rows" success message survives an invalidation.
+   * The initial mount and `deps` changes still show `loading`.
+   */
+  keepDataOnReload?: boolean;
 }
 
 export function useApi<T>(
@@ -45,17 +53,20 @@ export function useApi<T>(
     phase: 'loading',
   });
   const [nonce, setNonce] = useState(0);
-  const { isEmpty } = options;
+  const { isEmpty, keepDataOnReload } = options;
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     let active = true;
-    // Reset to the loading state when deps change / on reload. This is an
-    // intentional synchronous reset (the request is about to start), not a
-    // derived-state cascade, so the set-state-in-effect heuristic is suppressed.
+    // Reset to the loading state when deps change / on reload, UNLESS this is a
+    // background refresh (`keepDataOnReload`) of an already-loaded view — then
+    // keep the current data on screen so the subtree is not remounted. The
+    // request is about to start, so this synchronous reset is intentional.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState({ phase: 'loading' });
+    setState((prev) =>
+      keepDataOnReload && prev.phase === 'success' ? prev : { phase: 'loading' },
+    );
 
     fetcher()
       .then((data) => {
