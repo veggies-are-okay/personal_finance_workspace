@@ -16,6 +16,8 @@
 
 > - 2026-05-24: **DB schema & Item store** (P2.3). Added the canonical schema as SQLAlchemy 2.0 models (`backend-python/app/models.py`) + one Alembic migration (`alembic/versions/f0bda61fcf45_*`): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, the budget precompute tables (`budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`, covering every `/budget` field — DA-23), `plaid_items` (token `BYTEA` ciphertext — DA-12), `source_config`. Types per Appendix A (money `NUMERIC(14,2)`, percentages bare `NUMERIC`, datetimes `timestamptz`, enums `TEXT`+`CHECK`, token `BYTEA`). Mirrored as TypeORM entities (`backend-ts/src/entities/entities.ts`, `synchronize:false`, registered via `ALL_ENTITIES`). Added a **cross-backend schema-parity check** (DA-8): each backend exports a normalized snapshot (`app/schema_export.py`, `src/entities/schema-export.ts`) and `contracts/test/schema.parity.test.ts` (+ `src/schema.ts`) deep-compares them under `npm run test:parity`. — P2.3.
 
+> - 2026-05-24: **Ingestion → DB loader** (P3.1). Added `backend-python/app/ingestion/loader.py`: an idempotent loader that upserts the normalized signed-amount ledger into `transactions` on the unique `dedupe_key` = `sha256(account, date, signed_amount, normalized_description)` (DA-19) — re-import is an upsert, not a duplicate; money is `Decimal`. The DB-writing loader lives in `backend-python/` (under the `python-backend` CI gate); the raw→normalized-CSV normalizers stay in `scripts/`. Integration tests (`tests/test_loader.py`) run against the live Postgres service. — P3.1.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -41,6 +43,8 @@ personal_finance/
 │   ├── app/                   #   __init__ · config.py (pydantic-settings) · db.py (SQLAlchemy 2.0 engine/
 │   │                          #     Session/Base/get_db, psycopg3) · models.py (CANONICAL schema, P2.3) ·
 │   │                          #     schema_export.py (normalized snapshot for the parity check) ·
+│   │                          #     ingestion/loader.py (P3.1: idempotent normalized-ledger → transactions
+│   │                          #       upsert on the DA-19 dedupe_key) ·
 │   │                          #     schemas.py (HealthResponse) · main.py (create_app, CORS, GET /health)
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
 │   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema and item store

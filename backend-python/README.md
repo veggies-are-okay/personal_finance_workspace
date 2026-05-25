@@ -26,12 +26,15 @@ uv run ruff check . && uv run ruff format --check . && \
 | `app/db.py` | SQLAlchemy 2.0 engine/session/`Base`/`get_db` (psycopg3). |
 | `app/models.py` | SQLAlchemy 2.0 ORM models — the **canonical schema** (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`, `plaid_items` (token `BYTEA`), `source_config`. |
 | `app/schema_export.py` | Dumps a normalized schema snapshot (`python -m app.schema_export`) for the cross-backend schema-parity check (DA-8). |
+| `app/ingestion/loader.py` | **Idempotent ledger loader (P3.1):** upserts the normalized signed-amount ledger into `transactions` on the unique `dedupe_key` (`sha256(account, date, signed_amount, normalized_description)` — DA-19). Re-import is an upsert, not a duplicate. Money is `Decimal`. Consumes the rows `scripts/ledger.py` emits. |
 | `app/schemas.py` | Pydantic v2 response/request models (must match the canonical OpenAPI). |
 | `alembic/` | Migrations — the **canonical schema source**; `versions/f0bda61fcf45_*` is the P2.3 initial schema. |
 
 ## How it fits
 
-Serves **thin reads** of tables the ingestion pipeline (`scripts/`) precomputes — it does **not** recompute categorization/aggregates (that keeps parity with NestJS trivial). Every API/behavior change must land here **and** in `backend-ts/` in the same branch, with a `contracts/` parity test and a clean OpenAPI diff.
+Serves **thin reads** of tables the ingestion pipeline precomputes — it does **not** recompute categorization/aggregates (that keeps parity with NestJS trivial). Every API/behavior change must land here **and** in `backend-ts/` in the same branch, with a `contracts/` parity test and a clean OpenAPI diff.
+
+The raw→normalized-CSV **normalizers** live in the repo-root `scripts/` project; the **DB-writing loader/precompute** live here under `app/ingestion/` so they run under the `python-backend` CI gate and reuse `app.models`/`app.db`. `app/ingestion/loader.py` upserts the normalized ledger into `transactions` idempotently — its tests run against the live Postgres service (`docker compose up -d`, then `uv run alembic upgrade head`).
 
 **Gotchas:**
 - This is one of **two uv projects** — run these commands from `backend-python/` (the repo root is the *ingestion* uv project).
