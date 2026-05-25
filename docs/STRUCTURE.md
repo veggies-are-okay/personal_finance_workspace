@@ -35,6 +35,8 @@
 
 > - 2026-05-24: **Connections API + encrypted Item store + webhook** (P6.1, BE) — the Plaid connection lifecycle in **both** backends at strict parity. Python `app/connections/` + TS `src/connections/` (parity twins): `POST /api/v1/connections/link-token` (Plaid Link token), `POST /api/v1/connections/exchange` (exchange `public_token` → **encrypt + store** the `access_token`, never returned), `GET /api/v1/connections` (per-source `{mode,status}` + linked Items), `POST /api/v1/connections/webhook` (ES256 JWT/JWKS-verified — `iat` freshness + raw-body SHA-256 + rate-limit; unverified/forged/unsigned → canonical **401**, DA-11), and an OAuth redirect with a strict allowlist (no open redirect). **Token-at-rest (DA-12):** AES-256-GCM, key = base64 `APP_ENCRYPTION_KEY`, on-disk `nonce(12)‖ciphertext‖tag(16)` **byte-compatible across backends** (Python `cryptography.AESGCM` ↔ TS `node:crypto`). The Plaid client is **injected** (`PLAID_FAKE=1` selects a network-free fake → CI is hermetic); logs are **token-scrubbed** (DA-14). Reused the canonical 401 in both error layers (`app/errors.py` `UnauthorizedError`; `CanonicalUnauthorizedException`). Contracts: `IMPLEMENTED_PATHS` now includes the four connections paths (structural OpenAPI diff clean) + `test/connections.parity.test.ts` proving identical shapes, **no plaintext at rest**, **cross-backend decrypt**, forged/unsigned-webhook 401, **log-scrub**, and the redirect allowlist; the parity harness boots both backends with `PLAID_FAKE=1` + a synthetic shared key and captures logs to `contracts/.parity-logs/` (gitignored). Happy path verified end-to-end against the **real Plaid Sandbox** locally. — P6.1.
 
+> - 2026-05-24: **Docker dual-frontend stack** (P7.1, INFRA). `docker compose up --build` now runs the WHOLE stack: `postgres`, a one-shot `migrate` (backend-python image → `alembic upgrade head`, gated on `postgres` healthy), **both** backends (`backend-python` :8000, `backend-ts` :3000 — gated on `migrate` completed + `postgres` healthy, each with a `/health` healthcheck), and the SAME frontend image built twice — `frontend-python` (**:8501** → FastAPI) and `frontend-ts` (**:8502** → NestJS). Added `backend-python/Dockerfile` (multi-stage uv: `uv sync --locked` deps layer → slim runtime with the venv + `app/`/`alembic/`/`alembic.ini`, uvicorn on 0.0.0.0:8000), `backend-ts/Dockerfile` (multi-stage node: `npm ci` + `nest build` → prod-only runtime running `node dist/main.js` on :3000), `frontend/Dockerfile` + `frontend/nginx.conf.template` (build SPA with `VITE_API_BASE_URL=/api` → `nginx:alpine` serving the SPA with `try_files … /index.html` AND reverse-proxying `/api/` to `${BACKEND_UPSTREAM}` via built-in envsubst, `NGINX_ENVSUBST_FILTER=^BACKEND_`; trailing-slash `proxy_pass` strips the `/api` prefix → same-origin, no CORS), and `.dockerignore` in each (exclude venv/node_modules/tests/`.env`). Backends are NOT published to the host (host :8000 often occupied); Postgres host-publish moved to **5433** (host :5432 often occupied), internal `postgres:5432` unchanged; `pf_pgdata` retained. Frontend fix (FE, no contract change): `src/lib/api.ts` `buildUrl` resolves a **relative** base (`/api`) against `window.location.origin` so `new URL()` works under the proxy (+ test). FE gate green; app gates unaffected (Docker/compose/nginx only). — P7.1.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -42,7 +44,7 @@ Canonical source of truth for the repo layout. **Update this on every merge that
 ```
 personal_finance/
 ├── CLAUDE.md                  # Agent guidance (full briefing)
-├── docker-compose.yml         # Shared Postgres
+├── docker-compose.yml         # Full stack (P7.1): postgres + migrate one-shot + both backends + 2 frontends (8501→py, 8502→ts)
 ├── .env.example               # Env template (copy to .env; gitignored)
 ├── pyproject.toml             # ROOT uv project: data-prep utilities (scripts/ + tests/)
 │
@@ -58,6 +60,9 @@ personal_finance/
 │   │   ├── features/          #     one module per screen: story/ budget/ networth/ investments/ debt/ goals/ connections/
 │   │   │                      #       connections/ = Settings screen + isolated Plaid Link flow (usePlaidConnect, react-plaid-link)
 │   │   └── test/              #     setup.ts (jest-dom + MSW Node server + localStorage/matchMedia polyfills) · renderWithProviders.tsx
+│   ├── Dockerfile             #   P7.1: build SPA (VITE_API_BASE_URL=/api) → nginx:alpine SPA host + /api proxy (one image, 2 instances)
+│   ├── nginx.conf.template    #   P7.1: envsubst ${BACKEND_UPSTREAM} → serve SPA (try_files) + reverse-proxy /api/ (prefix-stripped)
+│   ├── .dockerignore          #   exclude node_modules/ · dist/ · coverage/ · .env
 │   ├── index.html             #   Vite HTML entry (#root)
 │   ├── vite.config.ts         #   @vitejs/plugin-react + @tailwindcss/vite + Vitest (jsdom, v8 cov ≥80%, excl main.tsx/mocks/browser/configs)
 │   ├── eslint.config.js       #   flat config: typescript-eslint + react-hooks + react-refresh
@@ -93,6 +98,8 @@ personal_finance/
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
 │   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema · ba4cb087cce7_* = P3.2 paystubs
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
+│   ├── Dockerfile             #   P7.1: multi-stage uv (uv sync --locked) → slim runtime (venv + app/ + alembic/); uvicorn 0.0.0.0:8000
+│   ├── .dockerignore          #   exclude .venv/ · tests/ · __pycache__/ · .env
 │   └── tests/                 #   conftest (TestClient) + test_health/test_config/test_db (≥80% cov on app)
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python
 │   ├── src/                   #   main.ts (bootstrap: global ValidationPipe, Swagger → /openapi.json,
@@ -119,6 +126,8 @@ personal_finance/
 │   │                          #     DataSource + repos overridden → boots without a DB; success/422/401/503 cases)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
+│   ├── Dockerfile             #   P7.1: multi-stage node (npm ci + nest build) → prod-only runtime; node dist/main.js on :3000
+│   ├── .dockerignore          #   exclude node_modules/ · dist/ · test/ · .env
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
 ├── contracts/                 # Cross-backend PARITY HARNESS (Node + Vitest) — enforces Rule #1
 │   ├── openapi.canonical.json #   Canonical contract — COMPLETE + FROZEN (P2.2/DA-25): all view +

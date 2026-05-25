@@ -1,0 +1,12 @@
+# Keep the build context (and final image) small and secret-free.
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+# Never ship secrets.
+.env
+.env.*
+Dockerfile
+.dockerignore
+README.md
