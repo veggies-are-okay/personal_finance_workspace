@@ -282,3 +282,99 @@ class NetWorth(BaseModel):
     @field_serializer("net_worth", "assets", "liabilities")
     def _serialize_money(self, value: Decimal) -> str:
         return _money_str(value)
+
+
+# --- Investments view (P4.4) -----------------------------------------------
+#
+# ``GET /api/v1/investments`` is a THIN read of the ``holdings`` table (design
+# §3). No analytics are recomputed: the portfolio totals and the allocation /
+# concentration percentages are simple deterministic aggregations of the stored
+# holding rows, computed IDENTICALLY in both backends so for the same DB state
+# FastAPI and NestJS return byte-identical bodies (DA-9).
+#
+# Wire conventions (Appendix A): market values (``portfolio_value``,
+# ``unrealized_gain``, allocation ``amount``, holding ``value``/``gain``) are
+# fixed-2dp decimal STRINGS (DA-2); allocation/concentration/holding
+# percentages are JSON NUMBERS on a 0-100 scale (DA-22).
+
+
+class Allocation(BaseModel):
+    """One asset-class allocation row (``/investments.allocation[]``).
+
+    ``actual_pct`` is the asset class's share of ``portfolio_value`` (its
+    market-value weight); ``target_pct`` is the sum of the class's stored
+    per-holding ``weight`` values (the intended/target allocation). ``amount``
+    is the class's total market value. The wire field is ``class`` (a Python
+    keyword), so the attribute is ``class_`` with a serialization alias.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    class_: str = Field(serialization_alias="class")
+    target_pct: Decimal
+    actual_pct: Decimal
+    amount: Decimal
+
+    @field_serializer("target_pct", "actual_pct")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+    @field_serializer("amount")
+    def _serialize_amount(self, value: Decimal) -> str:
+        return _money_str(value)
+
+
+class Concentration(BaseModel):
+    """One per-holding concentration row (``/investments.concentration[]``).
+
+    ``weight`` is the holding's share of ``portfolio_value`` (market-value
+    weight), so the concentration list ranks single-position risk.
+    """
+
+    holding: str
+    weight: Decimal
+
+    @field_serializer("weight")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+
+class Holding(BaseModel):
+    """One investment holding row (``/investments.holdings[]``).
+
+    ``weight`` is the stored per-holding weight column (the holding's intended
+    portfolio weight); ``value`` and ``gain`` are money decimal strings.
+    """
+
+    symbol: str
+    name: str
+    value: Decimal
+    weight: Decimal
+    gain: Decimal
+
+    @field_serializer("value", "gain")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)
+
+    @field_serializer("weight")
+    def _serialize_pct(self, value: Decimal) -> float:
+        return _percent_num(value)
+
+
+class Investments(BaseModel):
+    """The full ``GET /api/v1/investments`` response (design §3).
+
+    ``portfolio_value`` and ``unrealized_gain`` are money decimal strings; the
+    arrays are deterministic aggregations of the ``holdings`` table. Empty DB ->
+    ``"0.00"`` totals and empty arrays.
+    """
+
+    portfolio_value: Decimal
+    unrealized_gain: Decimal
+    allocation: list[Allocation]
+    concentration: list[Concentration]
+    holdings: list[Holding]
+
+    @field_serializer("portfolio_value", "unrealized_gain")
+    def _serialize_money(self, value: Decimal) -> str:
+        return _money_str(value)

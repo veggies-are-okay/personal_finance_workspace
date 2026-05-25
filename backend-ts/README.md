@@ -36,6 +36,13 @@ identically (see `.claude/rules/backend-parity.md`).
   a thin read identical to FastAPI's route (DA-9/DA-23). Totals are summed in integer cents (never a
   float). A `src/networth/` module (controller + query DTO + service reading the `accounts` repository)
   backs it.
+- `GET /api/v1/investments` (P4.4) → `200` Investments view, a thin read of the `holdings` table:
+  `portfolio_value`/`unrealized_gain` (summed in integer **cents** so the totals are byte-identical to
+  FastAPI's `Decimal` sum), `allocation[]` (by asset class: `actual_pct` = market share, `target_pct` =
+  summed per-holding weights, `amount`), `concentration[]` (per-holding market share, ranked desc),
+  `holdings[]` (by symbol). Empty DB → `"0.00"` totals + empty arrays. Money decimal **string**,
+  percentages numeric 0–100. **No recompute** — identical to FastAPI's route (DA-9/DA-23). A
+  `src/investments/` module (controller + service reading the `holdings` repository) backs it.
 
 ## Errors (canonical envelope — parity with FastAPI)
 

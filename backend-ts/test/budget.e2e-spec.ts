@@ -13,6 +13,7 @@ import {
   BudgetBucketAggregateEntity,
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
+  HoldingEntity,
   RecurringChargeEntity,
   TransactionEntity,
 } from '../src/entities/entities';
@@ -99,6 +100,8 @@ describe('BudgetController (e2e)', () => {
       .overrideProvider(getRepositoryToken(RecurringChargeEntity))
       .useValue(recurringRepo)
       .overrideProvider(getRepositoryToken(AccountEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(HoldingEntity))
       .useValue({})
       .compile();
 

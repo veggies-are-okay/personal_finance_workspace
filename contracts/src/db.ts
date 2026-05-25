@@ -272,3 +272,77 @@ export async function seedNetworthFixture(): Promise<void> {
     }
   });
 }
+
+// --- Investments fixture (P4.4) --------------------------------------------
+//
+// The Investments view is a THIN READ of the `holdings` table (DA-23), so the
+// cross-backend identity test (DA-9) pins those rows. A unique `symbol` prefix
+// keeps the fixture isolated from any other holdings, and rows are inserted out
+// of symbol order to prove both backends order/derive identically. The chosen
+// values land on clean 1dp percentage boundaries so FastAPI's Decimal-quantize
+// and NestJS's toFixed agree exactly.
+//   portfolio = 27000 + 18000 + 5000 = 50000
+//   equities (VTI 27000 + VXUS 18000) -> actual 90.0%, target 45.0+35.0 = 80.0%
+//   bonds    (BND 5000)               -> actual 10.0%, target 20.0%
+//   concentration (market share): VTI 54.0%, VXUS 36.0%, BND 10.0%
+
+const HOLDING_PREFIX = "PARITYP44_";
+
+interface SeedHolding {
+  symbol: string;
+  name: string;
+  value: string; // decimal string
+  weight: string; // percentage 0-100 (the holding's intended weight)
+  gain: string; // decimal string (signed)
+  assetClass: string;
+}
+
+const SEED_HOLDINGS: SeedHolding[] = [
+  {
+    symbol: `${HOLDING_PREFIX}VXUS`,
+    name: "Total Intl ETF",
+    value: "18000.00",
+    weight: "35.0",
+    gain: "1500.00",
+    assetClass: "equities",
+  },
+  {
+    symbol: `${HOLDING_PREFIX}VTI`,
+    name: "Total Market ETF",
+    value: "27000.00",
+    weight: "45.0",
+    gain: "3600.00",
+    assetClass: "equities",
+  },
+  {
+    symbol: `${HOLDING_PREFIX}BND`,
+    name: "Total Bond ETF",
+    value: "5000.00",
+    weight: "20.0",
+    gain: "-200.00",
+    assetClass: "bonds",
+  },
+];
+
+/** Remove any holdings this fixture owns (idempotent; safe before+after). */
+export async function cleanupInvestmentsFixture(): Promise<void> {
+  await withClient(async (client) => {
+    await client.query("DELETE FROM holdings WHERE symbol LIKE $1", [
+      `${HOLDING_PREFIX}%`,
+    ]);
+  });
+}
+
+/** Insert the synthetic holdings fixture (cleans first). */
+export async function seedInvestmentsFixture(): Promise<void> {
+  await cleanupInvestmentsFixture();
+  await withClient(async (client) => {
+    for (const h of SEED_HOLDINGS) {
+      await client.query(
+        `INSERT INTO holdings (symbol, name, value, weight, gain, asset_class)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [h.symbol, h.name, h.value, h.weight, h.gain, h.assetClass],
+      );
+    }
+  });
+}
