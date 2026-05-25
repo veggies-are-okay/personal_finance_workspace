@@ -8,6 +8,7 @@ import {
   buildTypeOrmOptions,
   DEFAULT_DATABASE_URL,
 } from './app.module';
+import { ALL_ENTITIES } from './entities/entities';
 import { HealthController } from './health/health.controller';
 
 /**
@@ -28,13 +29,20 @@ describe('buildTypeOrmOptions', () => {
       type: 'postgres',
       url,
       synchronize: false,
-      entities: [],
+      entities: ALL_ENTITIES,
       retryAttempts: 0,
     });
     expect(config.get).toHaveBeenCalledWith(
       'DATABASE_URL',
       DEFAULT_DATABASE_URL,
     );
+  });
+
+  it('registers all P2.3 entities (mirrors the Alembic schema)', () => {
+    const config = new ConfigService({});
+    const options = buildTypeOrmOptions(config);
+    expect(options.entities).toHaveLength(ALL_ENTITIES.length);
+    expect(options.entities).toContain(ALL_ENTITIES[0]);
   });
 
   it('falls back to the docker-compose default when DATABASE_URL is unset', () => {

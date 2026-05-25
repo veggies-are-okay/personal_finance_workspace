@@ -9,13 +9,19 @@ identically (see `.claude/rules/backend-parity.md`).
 - NestJS 11 (Express), TypeScript (strict)
 - `@nestjs/config` — reads the gitignored repo-root `.env` (`DATABASE_URL`, `TS_API_PORT`)
 - `@nestjs/swagger` — OpenAPI JSON served at **`/openapi.json`** (mirrors FastAPI), UI at `/docs`
-- TypeORM (postgres, `synchronize: false` — Alembic owns the schema; entities arrive in P2.1)
+- TypeORM (postgres, `synchronize: false` — Alembic owns the schema; entities in `src/entities/` **mirror** it, P2.3)
 - Jest + Supertest (via `@swc/jest`), ESLint + Prettier
 
 ## Endpoints
 
 - `GET /health` → `200`, body exactly `{"status":"ok"}`, `content-type: application/json`.
   DB-independent and byte-identical to FastAPI's `/health`.
+
+## Persistence (entities mirror the Alembic schema)
+
+- `src/entities/entities.ts` — TypeORM entities (`@Entity`/`@Column`/`@Check`) that **mirror** the Alembic-owned schema 1:1 (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, the budget precompute tables + `recurring_charges`, `plaid_items` (`access_token` `bytea`), `source_config`. `synchronize: false` — TypeORM never alters the schema. Registered via `ALL_ENTITIES` in `app.module.ts`.
+- `src/entities/schema-export.ts` — builds TypeORM metadata **without a DB connection** and prints a normalized schema snapshot (`node dist/entities/schema-export.js`). The `contracts/` schema-parity check (DA-8) deep-compares it against the Python snapshot so the entities can never drift from the Alembic head.
+- Column types match Appendix A: money `numeric(14,2)`, percentages bare `numeric`, datetimes `timestamptz`, enums `text` + `@Check`, Plaid token `bytea`.
 
 ## Commands (run from `backend-ts/`)
 

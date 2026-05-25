@@ -14,6 +14,8 @@
 
 > - 2026-05-24: Enforced "every PR via `branch-finalization`": added a `PreToolUse(Bash)` hook (`.claude/hooks/pr-create-reminder.sh` + committed `.claude/settings.json`) that reminds on `gh pr create`; the PR rule + both checklist runner skills now mandate the CI-gated PR flow (no local merge to protected `main`). — Enforce PR flow.
 
+> - 2026-05-24: **DB schema & Item store** (P2.3). Added the canonical schema as SQLAlchemy 2.0 models (`backend-python/app/models.py`) + one Alembic migration (`alembic/versions/f0bda61fcf45_*`): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, the budget precompute tables (`budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges`, covering every `/budget` field — DA-23), `plaid_items` (token `BYTEA` ciphertext — DA-12), `source_config`. Types per Appendix A (money `NUMERIC(14,2)`, percentages bare `NUMERIC`, datetimes `timestamptz`, enums `TEXT`+`CHECK`, token `BYTEA`). Mirrored as TypeORM entities (`backend-ts/src/entities/entities.ts`, `synchronize:false`, registered via `ALL_ENTITIES`). Added a **cross-backend schema-parity check** (DA-8): each backend exports a normalized snapshot (`app/schema_export.py`, `src/entities/schema-export.ts`) and `contracts/test/schema.parity.test.ts` (+ `src/schema.ts`) deep-compares them under `npm run test:parity`. — P2.3.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -37,17 +39,20 @@ personal_finance/
 │   └── .gitignore             #   node_modules/ · dist/ · coverage/ (also covered by root .gitignore)
 ├── backend-python/            # FastAPI + Pydantic v2 (uv project, package `app`); SQLAlchemy + Alembic
 │   ├── app/                   #   __init__ · config.py (pydantic-settings) · db.py (SQLAlchemy 2.0 engine/
-│   │                          #     Session/Base/get_db, psycopg3) · schemas.py (HealthResponse) ·
-│   │                          #     main.py (create_app, CORS, GET /health)
-│   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config; versions/ (empty until P2.1)
+│   │                          #     Session/Base/get_db, psycopg3) · models.py (CANONICAL schema, P2.3) ·
+│   │                          #     schema_export.py (normalized snapshot for the parity check) ·
+│   │                          #     schemas.py (HealthResponse) · main.py (create_app, CORS, GET /health)
+│   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
+│   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema and item store
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
 │   └── tests/                 #   conftest (TestClient) + test_health/test_config/test_db (≥80% cov on app)
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python
 │   ├── src/                   #   main.ts (bootstrap: global ValidationPipe, Swagger → /openapi.json,
 │   │                          #     listens on TS_API_PORT) · app.module.ts (ConfigModule reads repo-root
 │   │                          #     .env, TypeOrmModule.forRootAsync postgres synchronize:false retryAttempts:0,
-│   │                          #     buildTypeOrmOptions) · health/ (module · controller · service ·
-│   │                          #     health-response.dto.ts + *.spec.ts unit tests)
+│   │                          #     entities: ALL_ENTITIES) · entities/ (entities.ts — TypeORM mirror of the
+│   │                          #     Alembic schema, P2.3 · schema-export.ts — normalized snapshot for parity) ·
+│   │                          #     health/ (module · controller · service · health-response.dto.ts + *.spec.ts)
 │   ├── test/                  #   health.e2e-spec.ts (Supertest; DataSource overridden → boots without a DB)
 │   ├── package.json           #   scripts: lint · format:check · test:cov (Jest+SWC, ≥80% global) · start:dev · build
 │   ├── tsconfig*.json          #   strict TS; nest-cli.json · eslint.config.mjs · .prettierrc
@@ -60,10 +65,12 @@ personal_finance/
 │   ├── src/                   #   backends.ts (spawn/poll/teardown both backends; rogue-:8000 guard) ·
 │   │                          #     global-setup.ts (Vitest globalSetup) · normalize.ts (OpenAPI
 │   │                          #     structural normalizer) · contract.ts (canonical loader +
-│   │                          #     IMPLEMENTED_PATHS allowlist) · http.ts
+│   │                          #     IMPLEMENTED_PATHS allowlist) · schema.ts (run both schema exporters +
+│   │                          #     diff — the schema-parity check, DA-8) · http.ts
 │   ├── test/                  #   health-response.parity · openapi.parity (structural diff, scoped to
-│   │                          #     implemented paths) · endpoints.parity.stubs (it.todo per endpoint) ·
-│   │                          #     normalize.unit · contract.unit · backends.unit
+│   │                          #     implemented paths) · schema.parity (Alembic head ↔ TypeORM entities) ·
+│   │                          #     endpoints.parity.stubs (it.todo per endpoint) ·
+│   │                          #     normalize.unit · contract.unit · backends.unit · schema.unit
 │   ├── package.json           #   scripts: `test:parity` (canonical gate; pretest builds both backends) ·
 │   │                          #     `lint:openapi` (redocly) · `mock` (prism mock the canonical doc)
 │   ├── vitest.config.ts        #   globalSetup + single-fork · vitest.unit.config.ts (units, no boot)

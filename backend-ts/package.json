@@ -94,11 +94,13 @@
     },
     "collectCoverageFrom": [
       "src/**/*.(t|j)s",
-      "!src/main.ts"
+      "!src/main.ts",
+      "!src/entities/entities.ts"
     ],
     "coveragePathIgnorePatterns": [
       "/node_modules/",
-      "src/main.ts"
+      "src/main.ts",
+      "src/entities/entities.ts"
     ],
     "coverageDirectory": "./coverage",
     "coverageThreshold": {
