@@ -318,6 +318,61 @@ export class PlaidItemEntity {
   updatedAt!: Date;
 }
 
+@Entity({ name: 'paystubs' })
+@Unique('uq_paystubs_dedupe_key', ['dedupeKey'])
+export class PaystubEntity {
+  @PrimaryGeneratedColumn({ type: 'bigint' })
+  id!: string;
+
+  @Column({ type: 'text' })
+  employer!: string;
+
+  @Column({ name: 'period_start', type: 'date' })
+  periodStart!: string;
+
+  @Column({ name: 'period_end', type: 'date' })
+  periodEnd!: string;
+
+  @Column({ name: 'pay_date', type: 'date' })
+  payDate!: string;
+
+  @Column({ name: 'dedupe_key', type: 'text' })
+  dedupeKey!: string;
+
+  @Column({ name: 'gross_pay', type: 'numeric', precision: 14, scale: 2 })
+  grossPay!: string;
+
+  @Column({ name: 'net_pay', type: 'numeric', precision: 14, scale: 2 })
+  netPay!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2 })
+  taxes!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2 })
+  deductions!: string;
+
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  reimbursements!: string;
+
+  @Column({
+    name: 'retirement_401k_employee',
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    default: 0,
+  })
+  retirement401kEmployee!: string;
+
+  @Column({
+    name: 'retirement_401k_employer',
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    default: 0,
+  })
+  retirement401kEmployer!: string;
+}
+
 @Entity({ name: 'source_config' })
 @Unique('uq_source_config_source', ['source'])
 @Check('ck_source_config_source', `source IN ${SOURCE}`)
@@ -347,6 +402,7 @@ export const ALL_ENTITIES = [
   BudgetCategoryAggregateEntity,
   BudgetMonthlyAggregateEntity,
   RecurringChargeEntity,
+  PaystubEntity,
   PlaidItemEntity,
   SourceConfigEntity,
 ];

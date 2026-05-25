@@ -233,6 +233,41 @@ class RecurringCharge(Base):
     monthly_est: Mapped[object] = mapped_column(MONEY, nullable=False)
 
 
+class Paystub(Base):
+    """One pay stub — the **income** source for precompute (P3.2).
+
+    Mirrors the wide CSV ``scripts/extract_paystubs.py`` emits (the SUMMARY block
+    + itemized 401(k)/taxes). Feeds savings-rate / effective-tax-rate precompute.
+    All money columns are ``NUMERIC(14, 2)`` (Appendix A). Idempotent re-import
+    upserts on the unique ``dedupe_key`` (``hash(employer, pay_date, gross_pay,
+    net_pay)``) — mirrors the P3.1 loader's dedupe-on-key approach (DA-19).
+    """
+
+    __tablename__ = "paystubs"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_paystubs_dedupe_key"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employer: Mapped[str] = mapped_column(Text, nullable=False)
+    period_start: Mapped[object] = mapped_column(Date, nullable=False)
+    period_end: Mapped[object] = mapped_column(Date, nullable=False)
+    pay_date: Mapped[object] = mapped_column(Date, nullable=False)
+    # Idempotent re-import key (DA-19): hash(employer, pay_date, gross_pay, net_pay).
+    dedupe_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # SUMMARY block (per-period current amounts).
+    gross_pay: Mapped[object] = mapped_column(MONEY, nullable=False)
+    net_pay: Mapped[object] = mapped_column(MONEY, nullable=False)
+    taxes: Mapped[object] = mapped_column(MONEY, nullable=False)
+    deductions: Mapped[object] = mapped_column(MONEY, nullable=False)
+    reimbursements: Mapped[object] = mapped_column(MONEY, nullable=False, server_default="0")
+    # Itemized 401(k) employee/employer contributions (savings-rate inputs).
+    retirement_401k_employee: Mapped[object] = mapped_column(
+        MONEY, nullable=False, server_default="0"
+    )
+    retirement_401k_employer: Mapped[object] = mapped_column(
+        MONEY, nullable=False, server_default="0"
+    )
+
+
 class PlaidItem(Base):
     """A linked Plaid Item (one login → multiple products).
 

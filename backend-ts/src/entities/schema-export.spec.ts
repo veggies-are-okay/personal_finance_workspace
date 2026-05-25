@@ -66,10 +66,11 @@ describe('exportSchema', () => {
   it('emits every entity table with the canonical column types', async () => {
     const snapshot = await exportSchema();
 
-    // All 14 P2.3 tables present.
+    // All P2.3 tables + the P3.2 paystubs income table present.
     expect(Object.keys(snapshot)).toHaveLength(ALL_ENTITIES.length);
     expect(snapshot).toHaveProperty('transactions');
     expect(snapshot).toHaveProperty('plaid_items');
+    expect(snapshot).toHaveProperty('paystubs');
 
     // Representative type assertions (Appendix A).
     expect(snapshot.transactions.amount).toEqual({
@@ -81,6 +82,10 @@ describe('exportSchema', () => {
     expect(snapshot.plaid_items.created_at.type).toBe('timestamptz');
     expect(snapshot.plaid_items.products.type).toBe('text[]');
     expect(snapshot.accounts.currency.type).toBe('varchar(3)');
+    // P3.2 income inputs: money columns + Date pay_date.
+    expect(snapshot.paystubs.gross_pay.type).toBe('money');
+    expect(snapshot.paystubs.retirement_401k_employee.type).toBe('money');
+    expect(snapshot.paystubs.pay_date.type).toBe('date');
   });
 
   it('sorts tables and columns deterministically', async () => {

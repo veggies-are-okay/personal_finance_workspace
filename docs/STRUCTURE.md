@@ -20,6 +20,8 @@
 
 > - 2026-05-24: Added `scripts/evidence_term_shot.sh` (renders terminal output → PNG via the Playwright CLI) and standardized PR happy-path **screenshots** + full **inline** PR bodies (`gh pr create --body-file`). — PR evidence.
 
+> - 2026-05-24: **Precompute deterministic analytics** (P3.2). Added the `paystubs` income table — SQLAlchemy model (`backend-python/app/models.py`) + Alembic migration (`alembic/versions/ba4cb087cce7_*`) + mirrored TypeORM entity (`backend-ts/src/entities/entities.ts`, `PaystubEntity`); the schema-parity check + snapshots updated so `contracts/` stays green (DA-8). Added an idempotent income loader (`backend-python/app/ingestion/income_loader.py`, upsert on `sha256(employer, pay_date, gross_pay, net_pay)` — DA-19) and the **Python-only** precompute package (`backend-python/app/precompute/`: `categorize`, `rates`, `recurring`, `pipeline`) that reads `transactions` + `paystubs` → generic categorization + transfer/recurring detection + 50/30/20 buckets + savings/effective-tax rates (numeric 0–100, DA-22) and writes `budget_aggregates` + `budget_{bucket,category,monthly}_aggregates` + `recurring_charges` (every `/budget` field — DA-23). Golden-fixture tests assert exact aggregate values + determinism across runs (DA-9); both backends only READ these tables. — P3.2.
+
 Canonical source of truth for the repo layout. **Update this on every merge that adds/removes top-level dirs or key files** (same discipline as README — see `.claude/rules/structure-on-merge.md`).
 
 ## Top-level
@@ -46,10 +48,13 @@ personal_finance/
 │   │                          #     Session/Base/get_db, psycopg3) · models.py (CANONICAL schema, P2.3) ·
 │   │                          #     schema_export.py (normalized snapshot for the parity check) ·
 │   │                          #     ingestion/loader.py (P3.1: idempotent normalized-ledger → transactions
-│   │                          #       upsert on the DA-19 dedupe_key) ·
+│   │                          #       upsert on the DA-19 dedupe_key) · ingestion/income_loader.py (P3.2:
+│   │                          #       idempotent pay stubs → paystubs upsert) ·
+│   │                          #     precompute/ (P3.2 Python-only analytics: categorize · rates · recurring ·
+│   │                          #       pipeline.run_precompute → budget_* aggregates + recurring_charges) ·
 │   │                          #     schemas.py (HealthResponse) · main.py (create_app, CORS, GET /health)
 │   ├── alembic/               #   Migrations: env.py reads DATABASE_URL via app.config + imports app.models;
-│   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema and item store
+│   │                          #     versions/f0bda61fcf45_* = P2.3 initial schema · ba4cb087cce7_* = P3.2 paystubs
 │   ├── alembic.ini            #   Alembic config (URL resolved in env.py; no secrets here)
 │   └── tests/                 #   conftest (TestClient) + test_health/test_config/test_db (≥80% cov on app)
 ├── backend-ts/                # NestJS + TypeORM + class-validator (npm); parity twin of backend-python

@@ -25,7 +25,8 @@ import {
   type SchemaSnapshot,
 } from "../src/schema";
 
-// Every table P2.3 defines (covers DA-23 budget precompute + DA-12 token store).
+// Every table P2.3 defines (covers DA-23 budget precompute + DA-12 token store)
+// plus the P3.2 `paystubs` income table that feeds precompute.
 const EXPECTED_TABLES = [
   "accounts",
   "budget_aggregates",
@@ -37,6 +38,7 @@ const EXPECTED_TABLES = [
   "goals",
   "holdings",
   "loans",
+  "paystubs",
   "plaid_items",
   "recurring_charges",
   "source_config",
@@ -96,6 +98,20 @@ describe("schema parity: Alembic head <-> TypeORM entities (DA-8)", () => {
   it("the products column is a text array in BOTH backends", () => {
     expect(python.plaid_items.products.type).toBe("text[]");
     expect(typeorm.plaid_items.products.type).toBe("text[]");
+  });
+
+  it("the paystubs income table is identical in BOTH backends (P3.2)", () => {
+    // The precompute income source: money inputs + Date pay/period columns.
+    for (const col of ["gross_pay", "net_pay", "taxes", "deductions"]) {
+      expect(python.paystubs[col].type).toBe("money");
+      expect(typeorm.paystubs[col].type).toBe("money");
+    }
+    expect(python.paystubs.retirement_401k_employee.type).toBe("money");
+    expect(typeorm.paystubs.retirement_401k_employer.type).toBe("money");
+    for (const col of ["period_start", "period_end", "pay_date"]) {
+      expect(python.paystubs[col].type).toBe("date");
+      expect(typeorm.paystubs[col].type).toBe("date");
+    }
   });
 
   it("budget_aggregates + recurring_charges cover every /budget field (DA-23)", () => {

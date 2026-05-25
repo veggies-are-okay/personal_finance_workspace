@@ -19,7 +19,7 @@ identically (see `.claude/rules/backend-parity.md`).
 
 ## Persistence (entities mirror the Alembic schema)
 
-- `src/entities/entities.ts` — TypeORM entities (`@Entity`/`@Column`/`@Check`) that **mirror** the Alembic-owned schema 1:1 (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, the budget precompute tables + `recurring_charges`, `plaid_items` (`access_token` `bytea`), `source_config`. `synchronize: false` — TypeORM never alters the schema. Registered via `ALL_ENTITIES` in `app.module.ts`.
+- `src/entities/entities.ts` — TypeORM entities (`@Entity`/`@Column`/`@Check`) that **mirror** the Alembic-owned schema 1:1 (P2.3): accounts, transactions (+enrichment), categories, budgets, loans, goals, holdings, the budget precompute tables + `recurring_charges`, the P3.2 `paystubs` income table (`PaystubEntity`), `plaid_items` (`access_token` `bytea`), `source_config`. `synchronize: false` — TypeORM never alters the schema. Registered via `ALL_ENTITIES` in `app.module.ts`. **Read-only mirror:** the `paystubs` precompute analytics run in Python only (`backend-python/app/precompute/`); this backend never recomputes (DA-9).
 - `src/entities/schema-export.ts` — builds TypeORM metadata **without a DB connection** and prints a normalized schema snapshot (`node dist/entities/schema-export.js`). The `contracts/` schema-parity check (DA-8) deep-compares it against the Python snapshot so the entities can never drift from the Alembic head.
 - Column types match Appendix A: money `numeric(14,2)`, percentages bare `numeric`, datetimes `timestamptz`, enums `text` + `@Check`, Plaid token `bytea`.
 
