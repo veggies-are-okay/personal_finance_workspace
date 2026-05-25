@@ -124,3 +124,111 @@ export async function seedTransactionsFixture(): Promise<void> {
     }
   });
 }
+
+// --- Budget fixture (P4.2) -------------------------------------------------
+//
+// The Budget view reads the PRECOMPUTED aggregate tables (DA-23), so the
+// cross-backend identity test (DA-9) pins those rows. A unique `window`
+// selector keeps the fixture isolated, and recurring rows carry a unique
+// `merchant` prefix so cleanup never touches other data. Rows are deliberately
+// inserted out of canonical order to prove both backends sort identically.
+
+/** The dedicated synthetic window both backends serve in the budget parity test. */
+export const BUDGET_WINDOW = "parity-p42";
+const RECURRING_PREFIX = "ParityP42 ";
+
+/** Remove any rows this fixture owns (idempotent; safe to call before+after). */
+export async function cleanupBudgetFixture(): Promise<void> {
+  await withClient(async (client) => {
+    // `window` is a reserved word in Postgres -> quote the identifier.
+    await client.query('DELETE FROM budget_aggregates WHERE "window" = $1', [
+      BUDGET_WINDOW,
+    ]);
+    await client.query(
+      'DELETE FROM budget_bucket_aggregates WHERE "window" = $1',
+      [BUDGET_WINDOW],
+    );
+    await client.query(
+      'DELETE FROM budget_category_aggregates WHERE "window" = $1',
+      [BUDGET_WINDOW],
+    );
+    await client.query(
+      'DELETE FROM budget_monthly_aggregates WHERE "window" = $1',
+      [BUDGET_WINDOW],
+    );
+    await client.query("DELETE FROM recurring_charges WHERE merchant LIKE $1", [
+      `${RECURRING_PREFIX}%`,
+    ]);
+  });
+}
+
+/** Insert the synthetic budget aggregate fixture (cleans first). */
+export async function seedBudgetFixture(): Promise<void> {
+  await cleanupBudgetFixture();
+  await withClient(async (client) => {
+    await client.query(
+      `INSERT INTO budget_aggregates ("window", savings_rate, effective_tax_rate)
+       VALUES ($1, $2, $3)`,
+      [BUDGET_WINDOW, "22.0", "18.5"],
+    );
+    // Out-of-order (savings, needs, wants) -> both backends must emit 50/30/20.
+    for (const b of [
+      { name: "savings", target: "20.0", actual: "22.0", amount: "1100.00" },
+      { name: "needs", target: "50.0", actual: "48.0", amount: "2400.00" },
+      { name: "wants", target: "30.0", actual: "30.0", amount: "1500.00" },
+    ]) {
+      await client.query(
+        `INSERT INTO budget_bucket_aggregates
+           ("window", name, target_pct, actual_pct, amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [BUDGET_WINDOW, b.name, b.target, b.actual, b.amount],
+      );
+    }
+    // Out-of-order categories (rent, groceries) -> both must sort by name.
+    for (const c of [
+      { name: "rent", amount: "1800.00", bucket: "needs" },
+      { name: "groceries", amount: "420.00", bucket: "needs" },
+    ]) {
+      await client.query(
+        `INSERT INTO budget_category_aggregates ("window", name, amount, bucket)
+         VALUES ($1, $2, $3, $4)`,
+        [BUDGET_WINDOW, c.name, c.amount, c.bucket],
+      );
+    }
+    // Out-of-order months (March, February) -> both must sort by month.
+    for (const m of [
+      { month: "2026-03", needs: "2400.00", wants: "1500.00" },
+      { month: "2026-02", needs: "2350.00", wants: "1480.00" },
+    ]) {
+      await client.query(
+        `INSERT INTO budget_monthly_aggregates ("window", month, needs, wants)
+         VALUES ($1, $2, $3, $4)`,
+        [BUDGET_WINDOW, m.month, m.needs, m.wants],
+      );
+    }
+    // Out-of-order merchants (Streaming, Cloud) -> both must sort by merchant.
+    for (const r of [
+      {
+        merchant: `${RECURRING_PREFIX}Streaming Co`,
+        category: "entertainment",
+        cadence: "monthly",
+        last: "2026-05-01",
+        est: "15.99",
+      },
+      {
+        merchant: `${RECURRING_PREFIX}Cloud Backup`,
+        category: "software",
+        cadence: "monthly",
+        last: "2026-05-03",
+        est: "9.00",
+      },
+    ]) {
+      await client.query(
+        `INSERT INTO recurring_charges
+           (merchant, category, cadence, last_charged, monthly_est)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [r.merchant, r.category, r.cadence, r.last, r.est],
+      );
+    }
+  });
+}

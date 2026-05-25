@@ -7,7 +7,14 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
-import { TransactionEntity } from '../src/entities/entities';
+import {
+  BudgetAggregateEntity,
+  BudgetBucketAggregateEntity,
+  BudgetCategoryAggregateEntity,
+  BudgetMonthlyAggregateEntity,
+  RecurringChargeEntity,
+  TransactionEntity,
+} from '../src/entities/entities';
 
 /**
  * E2E contract for the canonical `GET /health` (mirrors the FastAPI test in
@@ -34,9 +41,19 @@ describe('HealthController (e2e)', () => {
     })
       .overrideProvider(getDataSourceToken())
       .useValue(fakeDataSource)
-      // The TransactionsModule's forFeature repo provider needs DataSource entity
-      // metadata; override it so the DB-independent /health app still boots.
+      // The feature modules' forFeature repo providers need DataSource entity
+      // metadata; override them so the DB-independent /health app still boots.
       .overrideProvider(getRepositoryToken(TransactionEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetBucketAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetCategoryAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(BudgetMonthlyAggregateEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecurringChargeEntity))
       .useValue({})
       .compile();
 

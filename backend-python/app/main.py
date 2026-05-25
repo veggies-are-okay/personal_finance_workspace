@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.errors import register_exception_handlers
-from app.routers import transactions
+from app.routers import budget, transactions
 from app.schemas import HealthResponse
 
 # Frontend dev origins (Vite). CORS is wired now so later UI work just works.
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
 
     # View endpoints (read precomputed/normalized tables; no recompute).
     app.include_router(transactions.router)
+    app.include_router(budget.router)
 
     return app
 

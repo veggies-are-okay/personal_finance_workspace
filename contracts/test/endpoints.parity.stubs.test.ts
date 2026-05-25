@@ -29,10 +29,9 @@ describe("view endpoints — value parity (TODO: Stage-4 BE branches)", () => {
   // offset-past-end / DB-down-503 value-parity assertions live in their own file
   // (test/transactions.parity.test.ts), per the P4.1 branch convention.
 
-  // P4.2 — GET /api/v1/budget
-  it.todo(
-    "GET /api/v1/budget: cross-backend byte-identical body for a seeded DB (DA-9); percentages numeric, money decimal-string",
-  );
+  // P4.2 — GET /api/v1/budget: IMPLEMENTED. The cross-backend identity (DA-9),
+  // unknown-window-empty, and DB-down-503 value-parity assertions live in their
+  // own file (test/budget.parity.test.ts), per the Stage-4 branch convention.
 
   // P4.3 — GET /api/v1/networth
   it.todo(

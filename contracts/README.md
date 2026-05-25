@@ -60,6 +60,14 @@ body other than `{"status":"ok"}`), so a misconfigured port can't silently pass.
   bad query (DA-1), an empty `data` + correct `total` for an offset past the end (DA-4),
   and — against a second short-lived backend pair pointed at an unreachable DB — an
   identical canonical **503** (DA-18).
+- **`test/budget.parity.test.ts`** (P4.2) — **cross-backend identity** (DA-9) for
+  `GET /api/v1/budget`. Seeds a synthetic budget fixture (`seedBudgetFixture` in `src/db.ts`,
+  keyed by a unique `window`) into the shared Postgres, then asserts FastAPI and NestJS return
+  the **same** parsed body (both thin-read the precomputed aggregate tables — no recompute,
+  DA-23): money decimal-string (DA-2), percentages numeric 0–100 (DA-22), dates `YYYY-MM-DD`,
+  deterministic ordering (50/30/20 buckets, categories/monthly/recurring sorted). Also covers an
+  unknown window → identical zeros + empty arrays, and — against the unreachable-DB backend pair —
+  an identical canonical **503** (DA-18).
 - **`test/endpoints.parity.stubs.test.ts`** — per-endpoint **value-parity stubs**
   (`it.todo`) for every not-yet-implemented view/source/connections endpoint; each names
   the concrete same-request→same-body / error / empty / degraded assertion a Stage-4 `BE`
@@ -112,8 +120,8 @@ backend running.
 
 Because the contract is frozen-and-complete but the backends implement it one `BE`
 branch at a time, `src/contract.ts` holds an **`IMPLEMENTED_PATHS`** allowlist of the
-operations that are LIVE in both backends today (`GET /health` and, since P4.1,
-`GET /api/v1/transactions`). The structural-diff test scopes its strict cross-backend
+operations that are LIVE in both backends today (`GET /health`, `GET /api/v1/transactions`
+since P4.1, and `GET /api/v1/budget` since P4.2). The structural-diff test scopes its strict cross-backend
 assertion to that set; **pending** operations are reported as `skip`/`todo` so the gate
 never fails just because the canonical doc lists a not-yet-built route.
 
