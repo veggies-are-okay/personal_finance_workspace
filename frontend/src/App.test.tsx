@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ThemeProvider } from './lib/theme';
 import { AppRoutes } from './App';
+
+// The Settings route embeds the Plaid Link hook; mock it so no external Plaid
+// script loads in jsdom (DATA PRIVACY — no real Plaid Link).
+vi.mock('react-plaid-link', () => ({
+  usePlaidLink: () => ({ open: vi.fn(), exit: vi.fn(), ready: false, error: null }),
+}));
 
 function renderApp(route = '/') {
   return render(
@@ -17,7 +23,7 @@ function renderApp(route = '/') {
 }
 
 describe('App shell', () => {
-  it('renders the sidebar with all six nav items and a Data Sources placeholder', () => {
+  it('renders the sidebar with all six nav items plus the Data Sources link', () => {
     renderApp();
     const nav = screen.getByRole('navigation', { name: /primary/i });
     for (const label of [
@@ -30,9 +36,22 @@ describe('App shell', () => {
     ]) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
     }
-    // Settings/Data Sources is a disabled placeholder until P5.2.
-    const placeholder = within(nav).getByText(/data sources/i);
-    expect(placeholder).toHaveAttribute('aria-disabled', 'true');
+    // Settings/Data Sources is an active nav link as of P5.2.
+    expect(within(nav).getByRole('link', { name: /data sources/i })).toHaveAttribute(
+      'href',
+      '/settings',
+    );
+  });
+
+  it('navigates to the Settings / Data Sources screen', async () => {
+    const user = userEvent.setup();
+    renderApp('/');
+    await user.click(screen.getByRole('link', { name: /data sources/i }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { level: 1, name: /data sources & connections/i }),
+      ).toBeInTheDocument(),
+    );
   });
 
   it('routes to the Story home by default', async () => {

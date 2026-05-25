@@ -186,3 +186,53 @@ export interface Goals {
   funding: GoalFunding[];
   affordability: Affordability;
 }
+
+// --- Connections (Plaid Link lifecycle + Settings) ---------------------------
+// Mirrors the `connections` schemas in `contracts/openapi.canonical.json`.
+
+/** Data-source family managed on the Settings screen. */
+export type Source = 'transactions' | 'income' | 'holdings' | 'loans' | 'listings';
+/** Plaid products requestable on a Link session / reported per Item. */
+export type PlaidProduct = 'transactions' | 'liabilities' | 'investments' | 'income';
+
+/** A linked Plaid Item (one institution login). */
+export interface ConnectionItem {
+  item_id: string;
+  institution: string;
+  products: PlaidProduct[];
+  status: ItemStatus;
+  sources: Source[];
+  /** ISO-8601 UTC instant; OMITTED when never synced. */
+  last_synced?: string;
+}
+/** Per-source mode (local file ↔ live API) and connection status. */
+export interface SourceConnection {
+  source: Source;
+  mode: SourceMode;
+  status: ItemStatus;
+}
+/** `GET /api/v1/connections` snapshot: linked Items + per-source mode/status. */
+export interface ConnectionsList {
+  items: ConnectionItem[];
+  sources: SourceConnection[];
+}
+
+/** `POST /api/v1/connections/link-token` request body. */
+export interface LinkTokenCreateRequest {
+  products?: PlaidProduct[];
+}
+/** `POST /api/v1/connections/link-token` response. */
+export interface LinkTokenResponse {
+  link_token: string;
+  /** ISO-8601 UTC instant the link token expires. */
+  expiration: string;
+}
+/** `POST /api/v1/connections/exchange` request body. */
+export interface ExchangeRequest {
+  public_token: string;
+}
+/** `POST /api/v1/connections/exchange` response. */
+export interface ExchangeResponse {
+  item_id: string;
+  status: ItemStatus;
+}
