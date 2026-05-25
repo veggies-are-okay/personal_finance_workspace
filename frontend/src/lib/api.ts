@@ -61,9 +61,21 @@ const JSON_BODY_HEADERS = {
   'Content-Type': 'application/json',
 } as const;
 
-/** Build `${base}${path}` with an optional query string. */
+/**
+ * Build `${base}${path}` with an optional query string.
+ *
+ * `apiBaseUrl` may be ABSOLUTE (`http://localhost:8000`, dev pointing straight
+ * at a backend) or RELATIVE (`/api`, the Docker same-origin nginx-proxy model).
+ * `new URL()` requires an absolute URL, so for a relative base we resolve it
+ * against the current document origin (`window.location.origin`).
+ */
 function buildUrl(path: string, query?: Record<string, string | undefined>): string {
-  const url = new URL(`${apiBaseUrl}${path}`);
+  const target = `${apiBaseUrl}${path}`;
+  const base =
+    typeof window !== 'undefined' && target.startsWith('/')
+      ? window.location.origin
+      : undefined;
+  const url = new URL(target, base);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== '') {

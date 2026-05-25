@@ -1,0 +1,38 @@
+# nginx config TEMPLATE. nginx:alpine runs envsubst over this at container start
+# (NGINX_ENVSUBST_FILTER=^BACKEND_ limits substitution to ${BACKEND_UPSTREAM}, so
+# nginx's own $host/$uri/$remote_addr below survive untouched).
+#
+# Two responsibilities:
+#   1. Serve the React SPA with history-API fallback (try_files -> /index.html).
+#   2. Reverse-proxy /api/ to the backend chosen by ${BACKEND_UPSTREAM}.
+#
+# The SPA is built with VITE_API_BASE_URL=/api, so the api client issues:
+#   getHealth()        -> GET /api/health
+#   getTransactions()  -> GET /api/api/v1/transactions
+# The trailing slash on proxy_pass below STRIPS the leading /api/ prefix, so the
+# backend sees /health and /api/v1/transactions respectively (its real routes).
+
+server {
+    listen 80;
+    server_name _;
+
+    # Same-origin API proxy. proxy_pass ends in "/" so the matched "/api/"
+    # location prefix is removed before forwarding:
+    #   /api/health             -> ${BACKEND_UPSTREAM}/health
+    #   /api/api/v1/transactions -> ${BACKEND_UPSTREAM}/api/v1/transactions
+    location /api/ {
+        proxy_pass ${BACKEND_UPSTREAM}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Static SPA with client-side routing fallback.
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}

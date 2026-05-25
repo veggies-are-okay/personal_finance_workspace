@@ -1,0 +1,14 @@
+# Keep the build context (and final image) small and secret-free.
+node_modules/
+dist/
+coverage/
+test/
+*.tsbuildinfo
+*.log
+.DS_Store
+# Never ship secrets — runtime config is injected via compose env.
+.env
+.env.*
+Dockerfile
+.dockerignore
+README.md

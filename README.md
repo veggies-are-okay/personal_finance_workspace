@@ -27,9 +27,26 @@ flowchart TD
 
 ## Quickstart
 
+### Run the whole stack with Docker (recommended)
+
+One command brings up Postgres, **both** backends, and the **same** frontend built twice — one instance wired to each backend so you can compare them side by side:
+
+```bash
+docker compose up --build
+# then open:
+#   http://localhost:8501   frontend → backend-python (FastAPI)
+#   http://localhost:8502   frontend → backend-ts     (NestJS)
+```
+
+Each frontend is an nginx container that serves the SPA and reverse-proxies `/api/` to its backend (same-origin, so no CORS). A one-shot `migrate` service runs `alembic upgrade head` (canonical schema) before the backends start. Copy `.env.example` → `.env` first for connector secrets (Plaid / encryption key); `DATABASE_URL` is set automatically inside the compose network.
+
+**Port notes:** the backends are reachable through the frontend proxies (`/api/`) and are intentionally **not** published to the host (host `:8000` is often occupied). Postgres is published on **`5433`** (host `:5432` is often occupied); inside the network it is still `postgres:5432`. `docker compose down` keeps the `pf_pgdata` volume. See [`frontend/README.md`](frontend/README.md) for the nginx `/api` proxy model.
+
+### Run components individually (dev)
+
 ```bash
 # 1. Shared database
-docker compose up -d                                   # Postgres on :5432
+docker compose up -d postgres                          # Postgres (host :5433 → container :5432)
 
 # 2. Python backend (FastAPI) — from backend-python/
 uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload   # :8000

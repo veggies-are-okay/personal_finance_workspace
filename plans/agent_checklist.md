@@ -108,7 +108,7 @@
 ## Wave 3 — Hardening & delivery
 
 ### P7.1 — Docker dual-frontend  *(type: INFRA)*
-- [ ] Compose builds the frontend twice: `8501 → python (:8000)`, `8502 → ts (:3000)`, plus Postgres + both backends.
+- [x] Compose builds the frontend twice: `8501 → python (:8000)`, `8502 → ts (:3000)`, plus Postgres + both backends.
   - *Verify:* both URLs load the app wired to their respective backend; the active base URL differs by instance.
 ### P7.2 — Parity & contract hardening  *(type: BE)*
 - [ ] OpenAPI structural diff covers **every** endpoint incl. error/empty/degraded (DB-down 503, not-connected 200-empty) states; parity tests exhaustive.

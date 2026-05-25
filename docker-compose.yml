@@ -1,6 +1,19 @@
-# Shared Postgres for both backends. Both backend-python/ and backend-ts/
-# read/write the SAME schema (Alembic owns migrations; TypeORM mirrors).
-# Run one backend at a time against this DB to compare parity.
+# Full local stack for the personal-finance app: shared Postgres, BOTH backends
+# (FastAPI + NestJS at strict 1:1 parity), and the SAME frontend image built
+# twice — one instance wired to each backend so you can compare them visually.
+#
+#   docker compose up --build
+#     http://localhost:8501   frontend -> backend-python (FastAPI)
+#     http://localhost:8502   frontend -> backend-ts     (NestJS)
+#
+# Each frontend is an nginx container that serves the SPA and reverse-proxies
+# /api/ to its backend (same-origin; no CORS needed). Alembic (the `migrate`
+# one-shot) owns the schema and runs before the backends start.
+#
+# Config: real secrets live in the gitignored repo-root `.env` (PLAID_*,
+# APP_ENCRYPTION_KEY, ...). DATABASE_URL is OVERRIDDEN here to the in-network
+# `postgres` host so it points at this compose's DB, not localhost.
+
 services:
   postgres:
     image: postgres:16
@@ -10,7 +23,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pf}
       POSTGRES_DB: ${POSTGRES_DB:-personal_finance}
     ports:
-      - "5432:5432"
+      # Host 5432 is commonly occupied (e.g. a local Postgres / SSH tunnel), so
+      # publish on 5433 to avoid a bind conflict. In-compose services still
+      # reach Postgres at host `postgres:5432` regardless of this mapping.
+      - "5433:5432"
     volumes:
       - pf_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,6 +34,100 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # One-shot: apply Alembic migrations (canonical schema), then exit. Backends
+  # wait for this to complete successfully before starting.
+  migrate:
+    build:
+      context: ./backend-python
+    image: pf-backend-python
+    container_name: pf_migrate
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pf}:${POSTGRES_PASSWORD:-pf}@postgres:5432/${POSTGRES_DB:-personal_finance}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend-python:
+    build:
+      context: ./backend-python
+    image: pf-backend-python
+    container_name: pf_backend_python
+    # Plaid / encryption secrets come from the repo-root .env (if present);
+    # DATABASE_URL is overridden below to the in-network postgres host.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pf}:${POSTGRES_PASSWORD:-pf}@postgres:5432/${POSTGRES_DB:-personal_finance}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Python slim has no curl; use the stdlib to probe the liveness route.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # Not published to the host: the :8000 host port is often occupied, and the
+    # backend is reachable via the frontend proxy at http://localhost:8501/api/.
+
+  backend-ts:
+    build:
+      context: ./backend-ts
+    image: pf-backend-ts
+    container_name: pf_backend_ts
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pf}:${POSTGRES_PASSWORD:-pf}@postgres:5432/${POSTGRES_DB:-personal_finance}
+      TS_API_PORT: "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # node slim has no curl; probe /health with the built-in http module.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # Not published to the host; reachable via the frontend proxy at
+    # http://localhost:8502/api/.
+
+  # The SAME frontend image, built once and reused. Each instance points its
+  # nginx /api/ proxy at a different backend via BACKEND_UPSTREAM.
+  frontend-python:
+    build:
+      context: ./frontend
+    image: pf-frontend
+    container_name: pf_frontend_python
+    environment:
+      BACKEND_UPSTREAM: http://backend-python:8000
+    ports:
+      - "8501:80"
+    depends_on:
+      - backend-python
+
+  frontend-ts:
+    # Reuse the image built by frontend-python (no second build).
+    image: pf-frontend
+    container_name: pf_frontend_ts
+    environment:
+      BACKEND_UPSTREAM: http://backend-ts:3000
+    ports:
+      - "8502:80"
+    depends_on:
+      - frontend-python
+      - backend-ts
 
 volumes:
   pf_pgdata:

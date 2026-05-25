@@ -31,9 +31,34 @@ The app talks to exactly one network boundary (`src/lib/api.ts`). Its base URL i
   VITE_API_BASE_URL=http://localhost:8010 npm run dev -- --port 5173
   ```
 
+`VITE_API_BASE_URL` may be **absolute** (`http://localhost:8000`, dev pointing
+straight at a backend) or **relative** (`/api`, the Docker same-origin model
+below). `src/lib/api.ts` resolves a relative base against the document origin so
+`new URL()` works either way.
+
 Mock scenario control (mock only): append `?scenario=empty` (DA-20 not-connected
 empty state) or `?scenario=error` (canonical 503) to any in-app fetch URL via the
 handlers — used by the tests to drive each state.
+
+### Docker: nginx SPA host + same-origin `/api` proxy (P7.1)
+
+`Dockerfile` produces **one** image (reused by both `frontend-python` and
+`frontend-ts` in the root `docker-compose.yml`). It is **backend-agnostic**:
+
+- **Build time:** the SPA is built with `VITE_API_BASE_URL=/api`, so the app
+  always calls **same-origin** `/api/*` (which also keeps the MSW mock off — it
+  only starts when `VITE_API_BASE_URL` is unset). No CORS is involved.
+- **Runtime:** the image is `nginx:alpine`. `nginx.conf.template` is processed by
+  nginx's built-in `envsubst` at start (`NGINX_ENVSUBST_FILTER=^BACKEND_`, so only
+  `${BACKEND_UPSTREAM}` is substituted and nginx's own `$host`/`$uri` survive). It
+  (1) serves the SPA with history-fallback (`try_files … /index.html`) and
+  (2) reverse-proxies `/api/` to `${BACKEND_UPSTREAM}`. Each compose instance sets
+  a different upstream (`http://backend-python:8000` vs `http://backend-ts:3000`),
+  so `:8501` is wired to FastAPI and `:8502` to NestJS.
+- **Path mapping:** `proxy_pass …/` (trailing slash) strips the `/api/` prefix, so
+  `/api/health` → backend `/health` and `/api/api/v1/transactions` → backend
+  `/api/v1/transactions` (the api client prefixes the `/api` base onto paths that
+  already include the backend's `/api/v1/...`).
 
 ### Settings / Data Sources + Plaid Link (P5.2)
 
@@ -62,7 +87,8 @@ The **Settings** screen (`/settings`, `src/features/connections/`) reads
 
 | Path | Role |
 |------|------|
-| `src/lib/api.ts` | The **single network boundary**: reads `VITE_API_BASE_URL`; all fetches go through here. |
+| `src/lib/api.ts` | The **single network boundary**: reads `VITE_API_BASE_URL` (absolute or relative `/api`); all fetches go through here. |
+| `Dockerfile` · `nginx.conf.template` | Multi-stage build → nginx SPA host + same-origin `/api` reverse proxy (one image, two compose instances). |
 | `src/lib/types.ts` | Wire types mirroring the canonical contract (Appendix A). |
 | `src/lib/useApi.ts` | The shared async state machine: `loading` / `success` / `error` / `not_connected`. |
 | `src/lib/format.ts` | Money-string + percentage-number display helpers. |
