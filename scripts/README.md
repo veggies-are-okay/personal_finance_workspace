@@ -18,6 +18,7 @@ uv run pytest                                        # tests in tests/ (syntheti
 | `extract_chase_statements.py` | Parse Chase PDF statements → normalized CSV (validated against the statement's printed total). |
 | `extract_paystubs.py` | Parse pay stubs → `docs/paystubs/paystubs.csv` schema. |
 | `ledger.py` | Per-source normalizers (Amex/Chase/Elan/Checking) + a combined signed-amount ledger loader. |
+| `evidence_term_shot.sh` | Renders captured terminal output → a PNG via the Playwright CLI — the PR happy-path proof screenshot (`.claude/rules/pull-requests.md` §3). |
 
 ## How it fits
 
